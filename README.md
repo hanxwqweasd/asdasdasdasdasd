@@ -200,6 +200,7 @@ BACKUP_DIR=/backups
 BACKUP_RETENTION_DAYS=14
 BACKUP_HOUR_UTC=2
 PRE_MIGRATION_BACKUP=true
+PRE_MIGRATION_BACKUP_REQUIRED=false
 
 ENABLE_METRICS=true
 METRICS_TOKEN=необязательный_секрет_не_короче_16_символов
@@ -279,3 +280,10 @@ load-tests/                HTTP, WebSocket и co-op тесты
 - Настоящее массовое списание Stars нельзя корректно симулировать без Telegram; тестируется серверная идемпотентность fulfillment, а финальный invoice-flow нужно пройти реальным тестовым аккаунтом.
 - Volume `/backups` защищает от пересоздания контейнера, но не заменяет независимое внешнее хранилище.
 - Перед широкой рекламой настройте Sentry, внешний uptime-check, внешний backup endpoint и лимиты PostgreSQL connections.
+
+
+## PostgreSQL 18 backup compatibility
+
+The Railway runtime image installs `postgresql-client-18` from the official PostgreSQL APT repository. This is required because `pg_dump` refuses to dump a server whose major version is newer than the client.
+
+`PRE_MIGRATION_BACKUP_REQUIRED=false` keeps startup available if an external backup destination or `pg_dump` temporarily fails. Set it to `true` only when a failed pre-migration backup must block every deployment.

@@ -86,3 +86,8 @@ PostgreSQL — источник истины. Redis хранит presence, rate 
 - миграции завершились;
 - backup Volume не воспринимается как единственная внешняя копия;
 - лимиты PostgreSQL connections соответствуют числу экземпляров.
+
+
+## Backup client version
+
+The production Docker image contains PostgreSQL client 18. Check it in Railway logs with `pg_dump --version`. Railway PostgreSQL 18 requires a client of major version 18 or newer. A pre-migration backup error is logged but does not stop the service by default; configure `PRE_MIGRATION_BACKUP_REQUIRED=true` to make it fatal.

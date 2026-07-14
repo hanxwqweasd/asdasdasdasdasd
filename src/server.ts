@@ -66,7 +66,20 @@ if(!config.DATABASE_URL){
   process.once('SIGTERM',()=>void shutdownSetup('SIGTERM'));
   process.once('SIGINT',()=>void shutdownSetup('SIGINT'));
 }else{
-if(config.PRE_MIGRATION_BACKUP){const exists=await pool.query(`SELECT to_regclass('public.users') existing`);if(exists.rows[0]?.existing){app.log.info('Creating pre-migration backup');await runBackupScript('pre-migration');}}
+if(config.PRE_MIGRATION_BACKUP){
+  const exists=await pool.query(`SELECT to_regclass('public.users') existing`);
+  if(exists.rows[0]?.existing){
+    app.log.info('Creating pre-migration backup');
+    try{
+      const backup=await runBackupScript('pre-migration');
+      app.log.info({path:backup.path,size:backup.size,checksum:backup.checksum},'Pre-migration backup completed');
+    }catch(error){
+      app.log.error({error},'Pre-migration backup failed');
+      if(config.PRE_MIGRATION_BACKUP_REQUIRED)throw error;
+      app.log.warn('Continuing startup because PRE_MIGRATION_BACKUP_REQUIRED=false');
+    }
+  }
+}
 await runMigrations();
 await bootstrapAdmin();
 const redis=await getRedis();if(config.NODE_ENV==='production'&&config.REDIS_REQUIRED_IN_PRODUCTION&&!redis)throw new Error('REDIS_URL is required in production. Add Railway Redis and reference REDIS_URL.');
