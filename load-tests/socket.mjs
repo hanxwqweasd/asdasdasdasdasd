@@ -1,0 +1,6 @@
+import {io} from 'socket.io-client';
+const base=process.env.BASE_URL||'http://127.0.0.1:8080';const clients=Number(process.env.CLIENTS||100);const concurrency=Number(process.env.CONCURRENCY||40);
+let next=0,connected=0,failed=0;const times=[];
+async function one(index){const started=performance.now();return new Promise(resolve=>{const socket=io(base,{path:'/socket.io',transports:['websocket'],auth:{devUserId:300000+index},reconnection:false,timeout:8000});const done=ok=>{times.push(performance.now()-started);ok?connected++:failed++;socket.disconnect();resolve();};socket.once('connect',()=>{socket.timeout(5000).emit('presence:heartbeat',{},err=>done(!err));});socket.once('connect_error',e=>{console.error(e.message);done(false);});});}
+async function worker(){while(next<clients){const index=next++;await one(index);}}
+const start=performance.now();await Promise.all(Array.from({length:Math.min(concurrency,clients)},worker));times.sort((a,b)=>a-b);const q=p=>times[Math.min(times.length-1,Math.floor(times.length*p))]||0;console.log(JSON.stringify({base,clients,connected,failed,durationMs:Math.round(performance.now()-start),p50Ms:Math.round(q(.5)),p95Ms:Math.round(q(.95)),p99Ms:Math.round(q(.99))},null,2));if(failed)process.exitCode=1;

@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
+  <meta name="theme-color" content="#0c0b0a">
+  <meta name="color-scheme" content="dark">
+  <title>Восьмого этажа нет</title>
+  <link rel="stylesheet" href="/styles.css">
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+  <script src="/socket.io/socket.io.js"></script>
+</head>
+<body>
+  <div class="weather-layer" aria-hidden="true"><div class="rain"></div><div class="window-glow"></div><div class="grain"></div></div>
+  <main class="app-shell" id="appShell">
+    <header class="topbar">
+      <button class="house-seal" data-tab="home" aria-label="Дом"><span>VIII</span></button>
+      <div class="brand-copy"><b>ВОСЬМОГО ЭТАЖА НЕТ</b><small id="buildingClock">00:08 · дом не спит</small></div>
+      <button id="soundButton" class="round-button" aria-label="Настройки звука">◒</button>
+    </header>
+
+    <section class="resident-strip" id="residentStrip">
+      <div><small>КВ.</small><strong id="apartmentNo">—</strong></div>
+      <div><small>НЕРВЫ</small><strong id="nerve">100</strong></div>
+      <div><small>ДОВЕРИЕ</small><strong id="trust">0</strong></div>
+      <div><small>УЛИКИ</small><strong id="clues">0</strong></div>
+      <div><small>МАРКИ</small><strong id="marks">0</strong></div>
+    </section>
+
+    <button id="dailyRibbon" class="daily-ribbon hidden"></button>
+    <section id="view" class="view"><div class="loading-scene"><i></i><p>Лифт считает этажи…</p></div></section>
+
+    <nav class="bottom-nav" id="bottomNav">
+      <button data-tab="home" class="active"><span>⌁</span><small>Этаж</small></button>
+      <button data-tab="coop"><span>◫</span><small>Вместе</small><i id="coopDot"></i></button>
+      <button data-tab="building"><span>▥</span><small>Подъезд</small></button>
+      <button data-tab="archive"><span>▤</span><small>Архив</small></button>
+      <button data-tab="market"><span>◇</span><small>Рынок</small></button>
+      <button data-tab="more"><span>•••</span><small>Ещё</small></button>
+    </nav>
+  </main>
+
+  <section id="tutorialOverlay" class="tutorial-overlay hidden" aria-live="polite"></section>
+  <dialog id="sheet" class="sheet"><div class="sheet-card"><header><div><small id="sheetKicker"></small><h2 id="sheetTitle"></h2></div><button id="sheetClose" class="round-button">×</button></header><div id="sheetBody"></div></div></dialog>
+  <aside id="soundPanel" class="sound-panel hidden">
+    <header><div><small>АУДИО ДОМА</small><h3>Слышать стены</h3></div><button id="soundClose" class="round-button">×</button></header>
+    <label>Окружение <output id="ambienceValue">55</output><input id="ambienceVolume" type="range" min="0" max="100" value="55"></label>
+    <label>События <output id="effectsValue">70</output><input id="effectsVolume" type="range" min="0" max="100" value="70"></label>
+    <label class="switch-row"><span>Вибрация</span><input id="vibrationToggle" type="checkbox" checked></label>
+    <label class="switch-row"><span>Полная тишина</span><input id="muteToggle" type="checkbox"></label>
+    <p>В наушниках слышны подсказки, которых нет в тексте.</p>
+  </aside>
+  <div id="toast" class="toast"></div>
+  <script type="module" src="/app.js"></script>
+</body>
+</html>

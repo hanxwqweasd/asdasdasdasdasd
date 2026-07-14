@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="robots" content="noindex,nofollow">
+  <title>Домоуправление — Восьмого этажа нет</title>
+  <link rel="stylesheet" href="/admin/admin.css">
+</head>
+<body>
+  <div class="grain" aria-hidden="true"></div>
+
+  <section id="loginScreen" class="login-screen">
+    <div class="login-card">
+      <div class="building-mark"><span>VIII</span></div>
+      <p class="eyebrow">Закрытый служебный вход</p>
+      <h1>Домоуправление</h1>
+      <p class="muted">Контроль жильцов, этажей, платежей и происшествий.</p>
+      <form id="loginForm" class="stack">
+        <label>Логин<input name="username" autocomplete="username" required></label>
+        <label>Пароль<input name="password" type="password" autocomplete="current-password" required minlength="12"></label>
+        <button class="button primary" type="submit">Открыть служебную дверь</button>
+      </form>
+      <p id="loginError" class="form-error" hidden></p>
+    </div>
+  </section>
+
+  <div id="appShell" class="app-shell" hidden>
+    <aside class="sidebar">
+      <div class="brand">
+        <div class="brand-sign">VIII</div>
+        <div><strong>Домоуправление</strong><span>служебный контур</span></div>
+      </div>
+      <nav id="navigation" class="nav-list"></nav>
+      <div class="sidebar-foot">
+        <div id="adminIdentity" class="admin-identity"></div>
+        <button id="logoutButton" class="button ghost full">Выйти</button>
+      </div>
+    </aside>
+
+    <main class="workspace">
+      <header class="topbar">
+        <div>
+          <p id="pageKicker" class="eyebrow">Сводка дома</p>
+          <h1 id="pageTitle">Панель управления</h1>
+        </div>
+        <div class="topbar-actions">
+          <span id="maintenanceBadge" class="status-badge neutral">режим дома</span>
+          <button id="refreshButton" class="icon-button" title="Обновить">↻</button>
+        </div>
+      </header>
+      <section id="content" class="content" aria-live="polite"></section>
+    </main>
+  </div>
+
+  <dialog id="modal" class="modal">
+    <form method="dialog" class="modal-frame" id="modalFrame">
+      <header><div><p id="modalKicker" class="eyebrow"></p><h2 id="modalTitle"></h2></div><button value="cancel" class="icon-button" aria-label="Закрыть">×</button></header>
+      <div id="modalBody" class="modal-body"></div>
+      <footer id="modalFooter" class="modal-footer"></footer>
+    </form>
+  </dialog>
+
+  <div id="toastStack" class="toast-stack"></div>
+  <script type="module" src="/admin/admin.js"></script>
+</body>
+</html>

@@ -1,0 +1,71 @@
+import Fastify from 'fastify';
+import helmet from '@fastify/helmet';
+import cors from '@fastify/cors';
+import rateLimit from '@fastify/rate-limit';
+import path from 'node:path';
+import fs from 'node:fs/promises';
+import crypto from 'node:crypto';
+import { fileURLToPath } from 'node:url';
+import { ZodError } from 'zod';
+import { config } from './config.js';
+import { pool } from './db.js';
+import { runMigrations } from './migrations.js';
+import { apiRoutes } from './routes/api.js';
+import { v2Routes } from './routes/v2.js';
+import { telegramWebhookRoutes } from './routes/telegram-webhook.js';
+import { configureTelegram } from './telegram.js';
+import { AppError } from './errors.js';
+import { adminRoutes } from './admin/routes.js';
+import { adminV2Routes } from './admin/v2-routes.js';
+import { bootstrapAdmin } from './admin/auth.js';
+import { startBroadcastWorker } from './admin/broadcast-worker.js';
+import { createRealtimeServer } from './realtime/coop.js';
+import { closeRedis,getRedis,redisHealth } from './redis.js';
+import { captureException,flushSentry,initSentry } from './observability/sentry.js';
+import { httpDuration,registry } from './observability/metrics.js';
+import { getSetting } from './settings.js';
+import { closeExpiredVotes } from './services/building.js';
+import { runBackupScript,startBackupWorker } from './backup/worker.js';
+
+initSentry();
+const app=Fastify({logger:{level:config.NODE_ENV==='development'?'debug':'info'},trustProxy:true,bodyLimit:2_000_000});
+await app.register(cors,{origin:false});
+await app.register(helmet,{contentSecurityPolicy:false,crossOriginEmbedderPolicy:false,frameguard:false});
+function requestIdentity(request:any):string{
+  const dev=request.headers?.['x-dev-user-id'];
+  if(config.ALLOW_DEV_AUTH&&config.NODE_ENV!=='production'&&typeof dev==='string'&&/^\d+$/.test(dev))return `dev:${dev}`;
+  const raw=request.headers?.['x-telegram-init-data'];
+  if(typeof raw==='string'&&raw.length>0){
+    try{const userRaw=new URLSearchParams(raw).get('user');const id=userRaw?JSON.parse(userRaw)?.id:null;if(id)return `tg:${id}`;}catch{}
+    return `tgdata:${crypto.createHash('sha256').update(raw).digest('hex').slice(0,24)}`;
+  }
+  return `ip:${request.ip}`;
+}
+await app.register(rateLimit,{max:config.RATE_LIMIT_MAX,timeWindow:'1 minute',keyGenerator:requestIdentity});
+
+app.addHook('onRequest',async request=>{(request as any).startedAt=process.hrtime.bigint();if(request.url.startsWith('/health')||request.url.startsWith('/metrics')||request.url.startsWith('/telegram/webhook'))return;const redis=await getRedis();if(redis){const bucket=Math.floor(Date.now()/60_000);const key=`http-limit:${requestIdentity(request)}:${bucket}`;const count=await redis.incr(key);if(count===1)await redis.expire(key,70);if(count>config.RATE_LIMIT_MAX)throw new AppError('Слишком много запросов',429,'DISTRIBUTED_RATE_LIMIT');}});
+app.addHook('onResponse',async(request,reply)=>{const started=(request as any).startedAt as bigint|undefined;if(started){const seconds=Number(process.hrtime.bigint()-started)/1e9;httpDuration.observe({method:request.method,route:request.routeOptions?.url??'unknown',status:String(reply.statusCode)},seconds);}});
+app.addHook('preHandler',async request=>{if(!['POST','PUT','PATCH','DELETE'].includes(request.method))return;if(!request.url.startsWith('/api/')||request.url.startsWith('/api/analytics')||request.url.startsWith('/api/sessions/'))return;if(await getSetting<boolean>('readonly_mode',false))throw new AppError('Дом переведён в аварийный режим только для чтения',503,'READONLY_MODE');});
+
+app.setErrorHandler((error,request,reply)=>{const err=error instanceof Error?error:new Error('Unknown server error');const isValidation=err instanceof ZodError;const appError=err instanceof AppError?err:null;const maybeDbCode=(err as any).code;const pgCode=typeof maybeDbCode==='string'&&/^\d{5}$/.test(maybeDbCode)?maybeDbCode:null;const dbStatus=pgCode==='23505'?409:pgCode&&['23503','23514','22P02'].includes(pgCode)?400:null;const statusCode=appError?.statusCode??(isValidation?400:dbStatus??500);const code=appError?.code??(isValidation?'VALIDATION_ERROR':pgCode?`DATABASE_${pgCode}`:'INTERNAL_ERROR');if(statusCode>=500){request.log.error({error:err},'Unhandled request error');captureException(err,{url:request.url,method:request.method});}else request.log.warn({error:err.message,code},'Request rejected');const message=statusCode>=500?'Внутренняя ошибка сервера':pgCode==='23505'?'Запись с такими данными уже существует':err.message;reply.code(statusCode).send({error:message,code,...(isValidation?{issues:(err as ZodError).issues}:{})});});
+
+if(config.PRE_MIGRATION_BACKUP){const exists=await pool.query(`SELECT to_regclass('public.users') existing`);if(exists.rows[0]?.existing){app.log.info('Creating pre-migration backup');await runBackupScript('pre-migration');}}
+await runMigrations();
+await bootstrapAdmin();
+const redis=await getRedis();if(config.NODE_ENV==='production'&&config.REDIS_REQUIRED_IN_PRODUCTION&&!redis)throw new Error('REDIS_URL is required in production. Add Railway Redis and reference REDIS_URL.');
+
+app.get('/health',async(_request,reply)=>{await pool.query('SELECT 1');const redisOk=await redisHealth();if(config.NODE_ENV==='production'&&config.REDIS_REQUIRED_IN_PRODUCTION&&!redisOk)return reply.code(503).send({ok:false,database:true,redis:false,name:'eighth-floor-v2'});return{ok:true,database:true,redis:redisOk,name:'eighth-floor-v2',version:config.APP_VERSION};});
+app.get('/metrics',async(request,reply)=>{if(!config.ENABLE_METRICS)return reply.code(404).send();if(config.METRICS_TOKEN&&request.headers.authorization!==`Bearer ${config.METRICS_TOKEN}`)return reply.code(401).send('unauthorized');return reply.type(registry.contentType).send(await registry.metrics());});
+
+await apiRoutes(app);await v2Routes(app);await telegramWebhookRoutes(app);await adminRoutes(app);await adminV2Routes(app);
+const realtime=redis?await createRealtimeServer(app.server,app.log):null;
+
+const publicDir=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'../public');
+const mime:Record<string,string>={'.html':'text/html; charset=utf-8','.css':'text/css; charset=utf-8','.js':'application/javascript; charset=utf-8','.svg':'image/svg+xml','.wav':'audio/wav','.ogg':'audio/ogg','.webm':'audio/webm','.png':'image/png','.webp':'image/webp','.ico':'image/x-icon'};
+app.get('/*',async(request,reply)=>{const raw=String((request.params as Record<string,string>)['*']??'');const relative=raw===''?'index.html':raw;const normalized=path.normalize(relative).replace(/^([.][.][/\\])+/,'');let file=path.resolve(publicDir,normalized);if(!file.startsWith(`${publicDir}${path.sep}`)&&file!==publicDir)throw new AppError('Недопустимый путь',400,'INVALID_PATH');try{const stat=await fs.stat(file);if(stat.isDirectory())file=path.join(file,'index.html');}catch{file=path.join(publicDir,'index.html');}const ext=path.extname(file);const buffer=await fs.readFile(file);return reply.header('cache-control',ext==='.html'?'no-store':'public, max-age=3600').type(mime[ext]??'application/octet-stream').send(buffer);});
+
+await configureTelegram().catch(error=>app.log.error({error},'Telegram configuration failed'));
+await app.listen({port:config.PORT,host:'0.0.0.0'});
+const stopBroadcastWorker=startBroadcastWorker(app.log);const stopBackupWorker=startBackupWorker(app.log);const voteTimer=setInterval(()=>void closeExpiredVotes().catch(error=>app.log.error({error},'Vote closer failed')),30_000);voteTimer.unref();
+let shuttingDown=false;async function shutdown(signal:string){if(shuttingDown)return;shuttingDown=true;app.log.info({signal},'Graceful shutdown');stopBroadcastWorker();stopBackupWorker();clearInterval(voteTimer);realtime?.stop();const force=setTimeout(()=>process.exit(1),12_000).unref();await app.close();await closeRedis();await pool.end();await flushSentry();clearTimeout(force);}
+process.once('SIGTERM',()=>void shutdown('SIGTERM'));process.once('SIGINT',()=>void shutdown('SIGINT'));

@@ -1,0 +1,27 @@
+services:
+  db:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_DB: eighth_floor
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports: ["5432:5432"]
+    volumes: ["eighth_floor_pg:/var/lib/postgresql/data"]
+  redis:
+    image: redis:7.4-alpine
+    command: redis-server --appendonly yes
+    ports: ["6379:6379"]
+    volumes: ["eighth_floor_redis:/data"]
+  app:
+    build: .
+    depends_on: [db, redis]
+    env_file: .env
+    environment:
+      DATABASE_URL: postgresql://postgres:postgres@db:5432/eighth_floor
+      REDIS_URL: redis://redis:6379
+    ports: ["8080:8080"]
+    volumes: ["eighth_floor_backups:/backups"]
+volumes:
+  eighth_floor_pg:
+  eighth_floor_redis:
+  eighth_floor_backups:
