@@ -9,7 +9,7 @@ function optionalEnv(value: unknown): string | undefined {
 function encode(value: string): string { return encodeURIComponent(value); }
 function connectionUrl(env: NodeJS.ProcessEnv, kind: 'postgres' | 'redis'): string | undefined {
   const candidates = kind === 'postgres'
-    ? [env.DATABASE_URL, env.DATABASE_PRIVATE_URL, env.POSTGRES_URL, env.POSTGRESQL_URL, env.POSTGRES_DATABASE_URL]
+    ? [env.DATABASE_URL, env.DATABASE_PRIVATE_URL, env.DATABASE_PUBLIC_URL, env.POSTGRES_URL, env.POSTGRESQL_URL, env.POSTGRES_DATABASE_URL]
     : [env.REDIS_URL, env.REDIS_PRIVATE_URL, env.REDIS_PUBLIC_URL];
   for (const candidate of candidates) { const value = optionalEnv(candidate); if (value) return value; }
   if (kind === 'redis') {
@@ -41,7 +41,7 @@ const raw={
 };
 const schema=z.object({
   NODE_ENV:z.enum(['development','test','production']).default('development'),PORT:z.coerce.number().int().positive().default(8080),PUBLIC_URL:optionalUrl,
-  DATABASE_URL:z.string({required_error:'PostgreSQL не подключён. Добавьте Railway PostgreSQL и reference DATABASE_URL.'}).min(1),
+  DATABASE_URL:z.string().min(1).optional(),
   REDIS_URL:z.string().min(1).optional(),REDIS_REQUIRED_IN_PRODUCTION:bool(true),
   BOT_TOKEN:z.string().min(10),BOT_USERNAME:z.string().min(3),WEBHOOK_SECRET:z.string().min(16),AUTH_MAX_AGE_SECONDS:z.coerce.number().int().positive().default(86400),
   ALLOW_DEV_AUTH:bool(false),DEV_USER_ID:z.coerce.number().int().positive().default(10001),

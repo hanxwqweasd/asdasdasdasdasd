@@ -49,6 +49,23 @@ app.addHook('preHandler',async request=>{if(!['POST','PUT','PATCH','DELETE'].inc
 
 app.setErrorHandler((error,request,reply)=>{const err=error instanceof Error?error:new Error('Unknown server error');const isValidation=err instanceof ZodError;const appError=err instanceof AppError?err:null;const maybeDbCode=(err as any).code;const pgCode=typeof maybeDbCode==='string'&&/^\d{5}$/.test(maybeDbCode)?maybeDbCode:null;const dbStatus=pgCode==='23505'?409:pgCode&&['23503','23514','22P02'].includes(pgCode)?400:null;const statusCode=appError?.statusCode??(isValidation?400:dbStatus??500);const code=appError?.code??(isValidation?'VALIDATION_ERROR':pgCode?`DATABASE_${pgCode}`:'INTERNAL_ERROR');if(statusCode>=500){request.log.error({error:err},'Unhandled request error');captureException(err,{url:request.url,method:request.method});}else request.log.warn({error:err.message,code},'Request rejected');const message=statusCode>=500?'Внутренняя ошибка сервера':pgCode==='23505'?'Запись с такими данными уже существует':err.message;reply.code(statusCode).send({error:message,code,...(isValidation?{issues:(err as ZodError).issues}:{})});});
 
+if(!config.DATABASE_URL){
+  const postgresKeys=['DATABASE_URL','DATABASE_PRIVATE_URL','DATABASE_PUBLIC_URL','POSTGRES_URL','POSTGRESQL_URL','POSTGRES_DATABASE_URL','PGHOST','PGPORT','PGUSER','PGPASSWORD','PGDATABASE','POSTGRES_HOST','POSTGRES_PORT','POSTGRES_USER','POSTGRES_PASSWORD','POSTGRES_DB','POSTGRES_DATABASE'];
+  const present=postgresKeys.filter(key=>typeof process.env[key]==='string'&&String(process.env[key]).trim().length>0);
+  const missing=['DATABASE_URL or PGHOST + PGUSER + PGDATABASE'];
+  app.log.error({presentPostgresVariables:present,missing},'PostgreSQL is not connected; starting setup-safe mode');
+  const payload={ok:true,setupRequired:true,database:false,redis:await redisHealth(),name:'eighth-floor-v2',version:config.APP_VERSION,missing,presentPostgresVariables:present};
+  app.get('/health',async()=>payload);
+  app.get('/setup-status',async()=>payload);
+  const setupHtml=`<!doctype html><html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Настройка PostgreSQL</title><style>body{margin:0;background:#090b0d;color:#e7e1d6;font:16px/1.55 system-ui,sans-serif;display:grid;min-height:100vh;place-items:center}.card{max-width:720px;margin:24px;padding:28px;border:1px solid #39342c;background:#121416;border-radius:18px;box-shadow:0 22px 80px #0008}h1{font-size:28px;margin:0 0 14px}code,pre{background:#08090a;border:1px solid #302d28;border-radius:8px;padding:3px 7px;color:#d8c39d}pre{padding:14px;overflow:auto}.bad{color:#ff9a86}.ok{color:#9dd7aa}li{margin:8px 0}</style></head><body><main class="card"><h1>Игра развёрнута, но PostgreSQL не подключён</h1><p class="bad">Контейнер больше не падает. Игровые API временно отключены до появления переменной базы.</p><ol><li>В Railway добавьте сервис <b>PostgreSQL</b> в это же окружение.</li><li>Откройте сервис игры → <b>Variables</b> → <b>Add Reference Variable</b>.</li><li>Выберите PostgreSQL → <code>DATABASE_URL</code>.</li><li>Убедитесь, что в сервисе игры создана ссылка вида:</li></ol><pre>DATABASE_URL=\${{Postgres.DATABASE_URL}}</pre><p>Если сервис называется иначе, Railway подставит его точное имя автоматически. Затем выполните новый Deploy.</p><p>Обнаруженные PostgreSQL-переменные: <code>${present.length?present.join(', '):'нет'}</code></p><p class="ok">После корректной привязки этот же архив автоматически запустит полную игру, миграции и админ-панель.</p></main></body></html>`;
+  app.get('/setup',async(_request,reply)=>reply.type('text/html; charset=utf-8').send(setupHtml));
+  app.get('/*',async(_request,reply)=>reply.type('text/html; charset=utf-8').send(setupHtml));
+  await app.listen({port:config.PORT,host:'0.0.0.0'});
+  let setupShuttingDown=false;
+  async function shutdownSetup(signal:string){if(setupShuttingDown)return;setupShuttingDown=true;app.log.info({signal},'Setup-safe shutdown');await app.close();await closeRedis();await flushSentry();}
+  process.once('SIGTERM',()=>void shutdownSetup('SIGTERM'));
+  process.once('SIGINT',()=>void shutdownSetup('SIGINT'));
+}else{
 if(config.PRE_MIGRATION_BACKUP){const exists=await pool.query(`SELECT to_regclass('public.users') existing`);if(exists.rows[0]?.existing){app.log.info('Creating pre-migration backup');await runBackupScript('pre-migration');}}
 await runMigrations();
 await bootstrapAdmin();
@@ -69,3 +86,5 @@ await app.listen({port:config.PORT,host:'0.0.0.0'});
 const stopBroadcastWorker=startBroadcastWorker(app.log);const stopBackupWorker=startBackupWorker(app.log);const voteTimer=setInterval(()=>void closeExpiredVotes().catch(error=>app.log.error({error},'Vote closer failed')),30_000);voteTimer.unref();
 let shuttingDown=false;async function shutdown(signal:string){if(shuttingDown)return;shuttingDown=true;app.log.info({signal},'Graceful shutdown');stopBroadcastWorker();stopBackupWorker();clearInterval(voteTimer);realtime?.stop();const force=setTimeout(()=>process.exit(1),12_000).unref();await app.close();await closeRedis();await pool.end();await flushSentry();clearTimeout(force);}
 process.once('SIGTERM',()=>void shutdown('SIGTERM'));process.once('SIGINT',()=>void shutdown('SIGINT'));
+
+}
