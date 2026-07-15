@@ -1,4 +1,4 @@
-# Telegram Mini App auth fix 2.0.4
+# Telegram Mini App auth fix 2.0.5
 
 This release fixes false `TELEGRAM_AUTH_REQUIRED` errors in Telegram clients.
 

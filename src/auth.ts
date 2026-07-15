@@ -10,7 +10,7 @@ import { changeInventory } from './services/economy.js';
 export interface TelegramUser { id:number; first_name:string; last_name?:string; username?:string; language_code?:string; photo_url?:string; }
 function safeEqualHex(a:string,b:string){if(!/^[a-f0-9]+$/i.test(a)||!/^[a-f0-9]+$/i.test(b)||a.length!==b.length)return false;return crypto.timingSafeEqual(Buffer.from(a,'hex'),Buffer.from(b,'hex'));}
 export function validateInitData(initData:string):TelegramUser{
-  const params=new URLSearchParams(initData);const hash=params.get('hash');if(!hash)throw new AppError('В Telegram-данных отсутствует подпись',401,'TELEGRAM_AUTH_INVALID');params.delete('hash');params.delete('signature');
+  const params=new URLSearchParams(initData);const hash=params.get('hash');if(!hash)throw new AppError('В Telegram-данных отсутствует подпись',401,'TELEGRAM_AUTH_INVALID');params.delete('hash');
   const dataCheckString=[...params.entries()].sort(([a],[b])=>a.localeCompare(b)).map(([key,value])=>`${key}=${value}`).join('\n');
   const secretKey=crypto.createHmac('sha256','WebAppData').update(config.BOT_TOKEN).digest();const calculated=crypto.createHmac('sha256',secretKey).update(dataCheckString).digest('hex');
   if(!safeEqualHex(hash,calculated))throw new AppError('Подпись Telegram недействительна',401,'TELEGRAM_AUTH_INVALID');const authDate=Number(params.get('auth_date'));if(!Number.isFinite(authDate)||Math.floor(Date.now()/1000)-authDate>config.AUTH_MAX_AGE_SECONDS)throw new AppError('Авторизация Telegram устарела',401,'TELEGRAM_AUTH_EXPIRED');
