@@ -159,6 +159,18 @@ END $$`,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 )`,
+`CREATE TABLE IF NOT EXISTS room_observations (
+  id UUID PRIMARY KEY,
+  expedition_id UUID REFERENCES expeditions(id) ON DELETE CASCADE,
+  user_id BIGINT REFERENCES users(id) ON DELETE CASCADE,
+  room_id TEXT NOT NULL,
+  action TEXT NOT NULL CHECK(action IN ('listen','inspect')),
+  variant_key TEXT NOT NULL,
+  payload JSONB NOT NULL DEFAULT '{}'::jsonb,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  UNIQUE(expedition_id,user_id,room_id,action,variant_key)
+)`,
+`CREATE INDEX IF NOT EXISTS room_observations_lookup_idx ON room_observations(expedition_id,user_id,room_id,action,created_at)`,
 `CREATE TABLE IF NOT EXISTS shop_products (
   sku TEXT PRIMARY KEY,
   title TEXT NOT NULL,
@@ -242,7 +254,7 @@ async function seedContent(): Promise<void> {
       VALUES($1,$2,$3,$4,$5,TRUE,$6,$7) ON CONFLICT(sku) DO NOTHING`,
       [item.sku,item.title,item.description,item.stars,item.icon,JSON.stringify(grants[item.sku] ?? {}),index]);
   }
-  const defaults: Record<string,unknown>={maintenance_mode:false,maintenance_message:'Дом временно закрыт. Лифт снова откроется позже.',expeditions_enabled:true,notes_enabled:true,shop_enabled:true,max_expedition_rooms:6};
+  const defaults: Record<string,unknown>={maintenance_mode:false,maintenance_title:'Дом закрыт на технические работы',maintenance_message:'Мы проверяем лифт, восстанавливаем комнаты и журнал жильцов. Ваш прогресс и покупки сохранены.',maintenance_eta:'Проверьте вход немного позже',maintenance_support_url:'',expeditions_enabled:true,notes_enabled:true,shop_enabled:true,max_expedition_rooms:6};
   for(const [key,value] of Object.entries(defaults)) await pool.query(`INSERT INTO system_settings(key,value) VALUES($1,$2) ON CONFLICT(key) DO NOTHING`,[key,JSON.stringify(value)]);
 }
 

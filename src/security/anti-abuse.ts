@@ -55,7 +55,9 @@ export async function executeIdempotent<T extends Record<string,unknown>>(userId
   if(existing.rows[0]){
     if(existing.rows[0].request_hash!==requestHash)throw new AppError('Ключ операции уже использован с другими данными',409,'IDEMPOTENCY_CONFLICT');
     if(existing.rows[0].status==='completed')return existing.rows[0].response_body as T;
-    if(new Date(existing.rows[0].expires_at).getTime()>Date.now())throw new AppError('Операция уже выполняется',409,'IDEMPOTENCY_IN_PROGRESS');
+    // Failed operations are safe to retry immediately with the same payload.
+    // Only an actually processing operation blocks a concurrent duplicate.
+    if(existing.rows[0].status==='processing'&&new Date(existing.rows[0].expires_at).getTime()>Date.now())throw new AppError('Операция уже выполняется',409,'IDEMPOTENCY_IN_PROGRESS');
   }
   const result=await withRedisLock(`idem:${userId}:${scope}:${key}`,30_000,async()=>{
     await pool.query(`INSERT INTO idempotency_records(user_id,scope,operation_key,request_hash,status,expires_at) VALUES($1,$2,$3,$4,'processing',NOW()+($5::text||' seconds')::interval)

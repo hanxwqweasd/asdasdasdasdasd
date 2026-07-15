@@ -49,17 +49,26 @@ export async function storageTransfer(userId:string|number,itemId:string,quantit
   const buildingId=await ensureBuildingMembership(userId);
   return withTransaction(async client=>{
     const signed=direction==='deposit'?quantity:-quantity;
-    if(direction==='deposit')await changeInventory(client,userId,itemId,-quantity,'building_deposit',operationId,{buildingId});
+    let inventoryQuantity:number;
+    if(direction==='deposit')inventoryQuantity=await changeInventory(client,userId,itemId,-quantity,'building_deposit',operationId,{buildingId});
     else{
       const stored=await client.query(`SELECT quantity FROM building_storage WHERE building_id=$1 AND item_id=$2 FOR UPDATE`,[buildingId,itemId]);
       if(Number(stored.rows[0]?.quantity??0)<quantity)throw new AppError('На складе недостаточно предметов',409,'BUILDING_STORAGE_INSUFFICIENT');
-      await changeInventory(client,userId,itemId,quantity,'building_withdraw',operationId,{buildingId});
+      inventoryQuantity=await changeInventory(client,userId,itemId,quantity,'building_withdraw',operationId,{buildingId});
     }
-    await client.query(`INSERT INTO building_storage(building_id,item_id,quantity) VALUES($1,$2,$3) ON CONFLICT(building_id,item_id) DO UPDATE SET quantity=building_storage.quantity+$3,updated_at=NOW()`,[buildingId,itemId,signed]);
-    await client.query(`DELETE FROM building_storage WHERE building_id=$1 AND item_id=$2 AND quantity<=0`,[buildingId,itemId]);
+    if(direction==='deposit'){
+      await client.query(`INSERT INTO building_storage(building_id,item_id,quantity) VALUES($1,$2,$3)
+        ON CONFLICT(building_id,item_id) DO UPDATE SET quantity=building_storage.quantity+EXCLUDED.quantity,updated_at=NOW()`,[buildingId,itemId,quantity]);
+    }else{
+      const updated=await client.query(`UPDATE building_storage SET quantity=quantity-$3,updated_at=NOW()
+        WHERE building_id=$1 AND item_id=$2 AND quantity>=$3 RETURNING quantity`,[buildingId,itemId,quantity]);
+      if(!updated.rowCount)throw new AppError('На складе недостаточно предметов',409,'BUILDING_STORAGE_INSUFFICIENT');
+      await client.query(`DELETE FROM building_storage WHERE building_id=$1 AND item_id=$2 AND quantity=0`,[buildingId,itemId]);
+    }
     await client.query(`INSERT INTO building_storage_log(building_id,user_id,item_id,delta,reason) VALUES($1,$2,$3,$4,$5)`,[buildingId,userId,itemId,signed,direction]);
-    await client.query(`UPDATE building_members SET contribution=contribution+$3,last_active_at=NOW() WHERE building_id=$1 AND user_id=$2`,[buildingId,userId,quantity]);
-    return{ok:true};
+    await client.query(`UPDATE building_members SET contribution=contribution+$3,last_active_at=NOW() WHERE building_id=$1 AND user_id=$2`,[buildingId,userId,direction==='deposit'?quantity:0]);
+    const remaining=await client.query(`SELECT quantity FROM building_storage WHERE building_id=$1 AND item_id=$2`,[buildingId,itemId]);
+    return{ok:true,itemId,direction,quantity,inventoryQuantity,storageQuantity:Number(remaining.rows[0]?.quantity??0)};
   });
 }
 

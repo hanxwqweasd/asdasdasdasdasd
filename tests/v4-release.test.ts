@@ -46,10 +46,10 @@ test('share story artwork and expanded icon set are packaged',async()=>{
   for(const id of ['footprint','manager','motion','biometric','voice','architect','story'])assert.match(icons,new RegExp(`id="${id}"`));
 });
 
-test('release is versioned as 4.1.0 and includes a month of content seeds',async()=>{
+test('release is versioned as 4.2.0 and includes a month of content seeds',async()=>{
   const pkg=JSON.parse(await readFile('package.json','utf8'));
   const migration=await readFile('src/v4/migrations.ts','utf8');
-  assert.equal(pkg.version,'4.1.0');
+  assert.equal(pkg.version,'4.2.0');
   assert.match(migration,/cycle<4/);
   assert.match(migration,/coop-three-knocks/);
   assert.match(migration,/chapter-manager-ledger/);

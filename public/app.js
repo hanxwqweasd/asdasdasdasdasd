@@ -1,4 +1,4 @@
-const APP_VERSION = "4.1.0";
+const APP_VERSION = "4.2.0";
 const tg = window.Telegram?.WebApp;
 
 if (tg) {
@@ -553,6 +553,10 @@ const state = {
   installPrompt: null,
   listening: false,
   listenHint: null,
+  inspectHint: null,
+  recommendedChoice: null,
+  maintenance: null,
+  lastObservationAction: null,
 };
 
 sessionStorage.setItem("ef_session", state.sessionId);
@@ -648,15 +652,18 @@ async function api(path, options = {}) {
 }
 
 function toast(text, tone = "neutral", withSound = true) {
-  toastEl.textContent = text;
+  const message = String(text || "Дом не ответил");
+  toastEl.innerHTML = `<span class="toast-mark" aria-hidden="true">${tone === "success" ? "✓" : tone === "error" ? "!" : tone === "warning" ? "△" : "·"}</span><span class="toast-copy">${esc(message)}</span>`;
   toastEl.dataset.tone = tone;
   toastEl.classList.add("show");
   clearTimeout(toastEl._t);
-  toastEl._t = setTimeout(() => toastEl.classList.remove("show"), 3000);
+  const duration = Math.min(7200, Math.max(3200, 2200 + message.length * 34));
+  toastEl._t = setTimeout(() => toastEl.classList.remove("show"), duration);
   if (withSound && tone === "success") void audioEngine.cue("uiSuccess");
   if (withSound && tone === "warning") void audioEngine.cue("uiWarning");
   if (withSound && tone === "error") void audioEngine.cue("uiError");
 }
+
 function haptic(type = "light") {
   if (!state.audio.vibration) return;
   if (type === "success" || type === "warning" || type === "error")
@@ -822,8 +829,40 @@ tg?.SettingsButton?.onClick?.(() =>
   $("#soundPanel")?.classList.remove("hidden"),
 );
 
+async function publicStatus() {
+  const response = await fetch(`/api/public-status?v=${encodeURIComponent(APP_VERSION)}&t=${Date.now()}`, { cache: "no-store" });
+  if (!response.ok) throw new Error("Не удалось проверить состояние дома");
+  return response.json();
+}
+function renderMaintenanceScreen(status) {
+  state.maintenance = status;
+  stopLoops();
+  document.body.classList.add("maintenance-mode");
+  let screen = $("#maintenanceScreen");
+  if (!screen) {
+    screen = document.createElement("section");
+    screen.id = "maintenanceScreen";
+    screen.className = "maintenance-screen";
+    document.body.appendChild(screen);
+  }
+  screen.innerHTML = `<div class="maintenance-card"><div class="maintenance-lift" aria-hidden="true"><div class="maintenance-panel">—</div><div class="maintenance-door left"></div><div class="maintenance-door right"></div><i></i></div><span class="eyebrow">ЛИФТ ВРЕМЕННО ОСТАНОВЛЕН</span><h1>${esc(status.title || "Дом закрыт на технические работы")}</h1><p>${esc(status.message || "Мы проверяем системы дома. Ваш прогресс сохранён.")}</p><div class="maintenance-status"><i></i><span>${esc(status.eta || "Проверьте вход немного позже")}</span></div><div class="button-row"><button class="primary" id="maintenanceRetry">Проверить двери ещё раз</button>${status.supportUrl ? '<button class="secondary" id="maintenanceSupport">Связаться с поддержкой</button>' : ""}</div><small>Версия ${esc(status.appVersion || APP_VERSION)} · проверено ${new Date(status.checkedAt || Date.now()).toLocaleTimeString("ru-RU", {hour:"2-digit",minute:"2-digit"})}</small></div>`;
+  finishBoot("Лифт остановлен на технические работы");
+  $("#maintenanceRetry")?.addEventListener("click", async () => {
+    const button = $("#maintenanceRetry");
+    button.disabled = true;
+    button.textContent = "Проверяем…";
+    try { const next = await publicStatus(); if (!next.maintenance) location.reload(); else { renderMaintenanceScreen(next); toast("Работы ещё продолжаются", "warning"); } }
+    catch (error) { toast(error.message, "error"); }
+    finally { if (button?.isConnected) { button.disabled = false; button.textContent = "Проверить двери ещё раз"; } }
+  });
+  $("#maintenanceSupport")?.addEventListener("click", () => tg?.openTelegramLink ? tg.openTelegramLink(status.supportUrl) : window.open(status.supportUrl, "_blank", "noopener"));
+}
 async function bootstrap({ preserveTab = true, quiet = false } = {}) {
   try {
+    const status = await publicStatus();
+    if (status.maintenance) { renderMaintenanceScreen(status); return; }
+    document.body.classList.remove("maintenance-mode");
+    $("#maintenanceScreen")?.remove();
     if (!quiet && bootStatus)
       bootStatus.textContent = "Telegram подтверждает квартиру…";
     await waitForTelegramInitData();
@@ -861,6 +900,10 @@ async function bootstrap({ preserveTab = true, quiet = false } = {}) {
       }, 300);
     }
   } catch (error) {
+    if (error.code === "MAINTENANCE_MODE") {
+      renderMaintenanceScreen({maintenance:true,title:"Дом закрыт на технические работы",message:error.message,eta:"Проверьте вход немного позже",appVersion:APP_VERSION,checkedAt:new Date().toISOString()});
+      return;
+    }
     finishBoot("Двери не открылись");
     renderLaunchError(error);
   }
@@ -1014,7 +1057,6 @@ function bindHome() {
     (hint) => {
       const caption = $(".cinematic .scene-caption p");
       if (caption) caption.textContent = hint;
-      toast("Дом ответил едва слышным стуком");
     },
   );
   $('[data-action="solo-start"]')?.addEventListener("click", startExpedition);
@@ -1069,8 +1111,8 @@ async function storyChoice(id) {
 function roomScene(exp) {
   const room = exp.room;
   const expeditionState = exp.state;
-  const hint =
-    state.listenHint?.roomId === room.id ? state.listenHint.text : null;
+  const hint = state.inspectHint?.roomId === room.id ? state.inspectHint.text : state.listenHint?.roomId === room.id ? state.listenHint.text : null;
+  const recommended = state.recommendedChoice?.roomId === room.id ? state.recommendedChoice.choiceIndex : null;
   return `${cinematic({
     kicker: `КОМНАТА ${exp.roomIndex + 1} ИЗ ${expeditionState.maxRooms} · ${room.ambience}`,
     title: room.title,
@@ -1081,8 +1123,8 @@ function roomScene(exp) {
   })}
   <div class="floor-map" aria-label="Маршрут экспедиции">${Array.from({ length: expeditionState.maxRooms }, (_, index) => `<i class="${index < exp.roomIndex ? "passed" : index === exp.roomIndex ? "current" : ""}"></i>`).join("")}</div>
   <div class="meter-grid"><div class="meter"><label>Самообладание <b>${expeditionState.nerve}</b></label><i style="--v:${expeditionState.nerve}%"></i></div><div class="meter"><label>Опасность <b>${expeditionState.danger}</b></label><i style="--v:${expeditionState.danger}%"></i></div><div class="meter"><label>Шум <b>${expeditionState.noise}</b></label><i style="--v:${expeditionState.noise}%"></i></div></div>
-  ${hint ? `<div class="card"><span class="eyebrow">УСЛЫШАННАЯ ПОДСКАЗКА</span><p>${esc(hint)}</p></div>` : ""}
-  <div class="choice-list">${room.choices.map((choice, index) => `<button class="choice-button ${hint && index === 0 ? "choice-recommended" : ""}" data-solo-choice="${index}"><b>${esc(choice.label)}</b><small>${choice.requires ? `${icon("key", "button-icon")} нужен предмет: ${esc(choice.requires)}` : "дом запомнит решение"}</small></button>`).join("")}</div>`;
+  ${hint ? `<div class="card observation-card"><span class="eyebrow">${state.lastObservationAction === "inspect" ? "НАЙДЕННАЯ ДЕТАЛЬ" : "УСЛЫШАННАЯ ПОДСКАЗКА"}</span><p>${esc(hint)}</p></div>` : ""}
+  <div class="choice-list">${room.choices.map((choice, index) => `<button class="choice-button ${recommended === index ? "choice-recommended" : ""}" data-solo-choice="${index}"><b>${esc(choice.label)}</b><small>${choice.requires ? `${icon("key", "button-icon")} нужен предмет: ${esc(choice.requires)}` : recommended === index ? "наблюдение указывает на этот вариант" : "последствия сохранятся в истории"}</small></button>`).join("")}</div>`;
 }
 function renderSoloExpedition() {
   view.innerHTML = roomScene(state.expedition);
@@ -1102,48 +1144,52 @@ function bindSceneInteractions(room, onReveal = () => renderSoloExpedition()) {
   const listenButton = $("[data-scene-listen]", scene);
   const lookButton = $("[data-scene-look]", scene);
   const overlay = $(".listen-overlay", scene);
-  const hints = {
-    radio: "В радиошуме два удара повторяются раньше остальных.",
-    voices: "Голос справа не отражается от стены. Он находится ближе.",
-    wet: "Вода течёт против уклона пола — след ведёт не к двери.",
-    archive: "Одна папка лежит корешком внутрь. Её открывали недавно.",
-    dark: "За дверью тишина прерывается каждые восемь секунд.",
-    corridor: "Слева слышен ключ, справа — только дыхание.",
-  };
-  listenButton?.addEventListener("click", async () => {
-    if (state.listening) return;
+  const runObservation = async (action) => {
+    const button = action === "listen" ? listenButton : lookButton;
+    if (!button || button.disabled || state.listening) return;
     state.listening = true;
-    listenButton.classList.add("active");
-    overlay.classList.add("active");
+    button.disabled = true;
+    button.classList.add("active");
+    overlay?.classList.add("active");
+    $(".listen-copy", overlay)?.replaceChildren(document.createTextNode(action === "listen" ? "Дом отделяет полезный звук от шума…" : "Вы отмечаете детали, которые не совпадают с планом…"));
     haptic("medium");
-    void ambient(
-      room?.ambience === "radio" ? "intercom" : "whisper",
-      0.34,
-      room?.ambience === "voices" ? 0.75 : -0.45,
-    );
-    await wait(state.motionReduced ? 250 : 1900);
-    const text = hints[room?.ambience] || hints.corridor;
-    state.listenHint = { roomId: room?.id, text };
-    $(".listen-copy", overlay).textContent = text;
-    haptic("success");
-    await wait(state.motionReduced ? 200 : 850);
-    overlay.classList.remove("active");
-    listenButton.classList.remove("active");
-    state.listening = false;
-    onReveal(text);
-    track("scene_listen", { roomId: room?.id, ambience: room?.ambience });
-  });
-  lookButton?.addEventListener("click", async () => {
-    lookButton.classList.add("active");
-    $(".scene-noise", scene)?.classList.add("active");
-    void effect("camera", 0.55, 0.3);
-    haptic();
-    await wait(420);
-    $(".scene-noise", scene)?.classList.remove("active");
-    lookButton.classList.remove("active");
-    toast("На снимке дверь кажется приоткрытой");
-    track("scene_inspect", { roomId: room?.id });
-  });
+    if (action === "listen") void audioEngine.cue(room?.ambience === "radio" ? "intercom" : "houseWhisper", { volume: 0.55, pan: room?.ambience === "voices" ? 0.72 : -0.42 });
+    else void audioEngine.cue("camera", { volume: 0.72, pan: 0.24 });
+    try {
+      const endpoint = state.expedition?.status === "active" && state.expedition?.room?.id === room?.id
+        ? `/api/expeditions/${state.expedition.id}/observe`
+        : "/api/scenes/observe";
+      const body = endpoint.includes("/expeditions/")
+        ? { action, operationId: opId() }
+        : { sceneKey: room?.id || "home-elevator", action, operationId: opId() };
+      const result = await api(endpoint, { method: "POST", body: JSON.stringify(body) });
+      const observation = result.observation;
+      if (result.state && state.expedition) state.expedition.state = result.state;
+      if (observation?.recommendedChoiceIndex != null && state.expedition) state.recommendedChoice = { roomId: room.id, choiceIndex: observation.recommendedChoiceIndex };
+      const copy = `${observation.text} ${observation.detail || ""}`.trim();
+      state.lastObservationAction = action;
+      if (action === "listen") state.listenHint = { roomId: room?.id, text: copy };
+      else state.inspectHint = { roomId: room?.id, text: copy };
+      if ($(".listen-copy", overlay)) $(".listen-copy", overlay).textContent = copy;
+      if (observation.clueAwarded) {
+        void audioEngine.cue("clueFound");
+        toast(`Найдена дополнительная улика. ${copy}`, "success");
+      } else toast(copy, observation.intensity === "urgent" ? "warning" : "neutral");
+      haptic(observation.clueAwarded ? "success" : "light");
+      await wait(state.motionReduced ? 180 : 780);
+      onReveal(copy, action, observation);
+      track(action === "listen" ? "scene_listen" : "scene_inspect", { roomId: room?.id, ambience: room?.ambience, variant: observation.key });
+    } catch (error) {
+      toast(error.message, error.code === "ROOM_OBSERVATION_EXHAUSTED" ? "warning" : "error");
+    } finally {
+      overlay?.classList.remove("active");
+      button.classList.remove("active");
+      button.disabled = false;
+      state.listening = false;
+    }
+  };
+  listenButton?.addEventListener("click", () => runObservation("listen"));
+  lookButton?.addEventListener("click", () => runObservation("inspect"));
   bindParallax(scene);
 }
 
@@ -1175,6 +1221,8 @@ async function startExpedition() {
     ]);
     state.expedition = expedition;
     state.listenHint = null;
+    state.inspectHint = null;
+    state.recommendedChoice = null;
     track("expedition_start");
     renderHome();
   } catch (error) {
@@ -1479,7 +1527,7 @@ function formatTime(sec) {
 
 function renderBuilding() {
   const b = state.v2.building;
-  view.innerHTML = `${section(b.building?.title || "Ваш подъезд", "Постоянное сообщество до 30 реальных жильцов.")}<div class="building-hero"><div><span class="eyebrow">${esc(b.building?.code || "П-???")}</span><div class="building-code">${b.members.length} жильцов</div><p>Старший: ${esc(b.building?.elder_name || "ещё не выбран")} · доверие дома ${b.building?.trust_score || 0}</p><div class="progress-track"><i style="width:${Math.min(100, Number(b.building?.shared_progress || 0))}%"></i></div></div><button class="round-button" data-building="invite" aria-label="Пригласить жильца">${icon("plus")}</button></div>${section("Доска объявлений", "Записи видит только ваш подъезд.", '<button class="secondary" data-building="post">Оставить запись</button>')}<div>${b.posts.length ? b.posts.map((p) => `<article class="board-post"><small>${esc(p.author_name)} · ${fmtDate(p.created_at)}</small><p>${esc(p.body)}</p></article>`).join("") : '<div class="empty">На доске пока только следы от кнопок.</div>'}</div>${section("Жильцы", "Доверие формируется поступками, его нельзя купить.")}<div class="card member-list">${b.members.map((m) => `<div class="member"><span class="resident-avatar">${esc(m.first_name?.[0] || "?")}</span><div><b>${esc(m.first_name)}</b><small>кв. ${m.apartment_no}${m.profession ? " · " + roleName(m.profession) : ""}</small></div><div style="text-align:right"><i class="dot ${m.online ? "online" : ""}"></i><small>${m.local_trust} доверия</small></div></div>`).join("")}</div>${section("Общий склад", "Предметы можно оставить соседям или взять для общей цели.")}<div class="storage-grid">${b.storage.length ? b.storage.map((x) => `<div class="storage-item"><div class="icon">${itemIcon(x.item_id)}</div><b>${esc(itemName(x.item_id))}</b><p>На складе: ${x.quantity}</p><button class="tiny-button" data-storage="withdraw" data-item="${x.item_id}">Взять 1</button></div>`).join("") : '<div class="empty" style="grid-column:1/-1">Склад пуст.</div>'}</div><button class="secondary full" data-building="deposit" style="margin-top:8px">Положить предмет на склад</button>${section("Голосования", "Решения меняют последствия для всего подъезда.")}<div>${b.votes.length ? b.votes.map(renderVote).join("") : '<div class="empty">Открытых голосований нет.</div>'}</div>${section("Цель недели", "Совместный прогресс сохраняется для подъезда.")}<div>${b.goals.map((g) => `<div class="card"><h3>${esc(g.title)}</h3><div class="progress-track"><i style="width:${Math.min(100, (Number(g.progress) / Number(g.target)) * 100)}%"></i></div><p>${g.progress}/${g.target}</p></div>`).join("")}</div>`;
+  view.innerHTML = `${section(b.building?.title || "Ваш подъезд", "Постоянное сообщество до 30 реальных жильцов.")}<div class="building-hero"><div><span class="eyebrow">${esc(b.building?.code || "П-???")}</span><div class="building-code">${b.members.length} жильцов</div><p>Старший: ${esc(b.building?.elder_name || "ещё не выбран")} · доверие дома ${b.building?.trust_score || 0}</p><div class="progress-track"><i style="width:${Math.min(100, Number(b.building?.shared_progress || 0))}%"></i></div></div><button class="round-button" data-building="invite" aria-label="Пригласить жильца">${icon("plus")}</button></div>${section("Доска объявлений", "Записи видит только ваш подъезд.", '<button class="secondary" data-building="post">Оставить запись</button>')}<div>${b.posts.length ? b.posts.map((p) => `<article class="board-post"><small>${esc(p.author_name)} · ${fmtDate(p.created_at)}</small><p>${esc(p.body)}</p></article>`).join("") : '<div class="empty">На доске пока только следы от кнопок.</div>'}</div>${section("Жильцы", "Доверие формируется поступками, его нельзя купить.")}<div class="card member-list">${b.members.map((m) => `<div class="member"><span class="resident-avatar">${esc(m.first_name?.[0] || "?")}</span><div><b>${esc(m.first_name)}</b><small>кв. ${m.apartment_no}${m.profession ? " · " + roleName(m.profession) : ""}</small></div><div style="text-align:right"><i class="dot ${m.online ? "online" : ""}"></i><small>${m.local_trust} доверия</small></div></div>`).join("")}</div>${section("Общий склад", "Предметы можно оставить соседям или взять для общей цели.")}<div class="storage-grid">${b.storage.length ? b.storage.map((x) => `<div class="storage-item"><div class="icon">${itemIcon(x.item_id)}</div><b>${esc(itemName(x.item_id))}</b><p>На складе: ${x.quantity}</p><button class="tiny-button" data-storage="withdraw" data-item="${x.item_id}" data-max="${x.quantity}">${icon("collection", "button-icon")}Взять со склада</button></div>`).join("") : '<div class="empty" style="grid-column:1/-1">Склад пуст.</div>'}</div><button class="secondary full" data-building="deposit" style="margin-top:8px">Положить предмет на склад</button>${section("Голосования", "Решения меняют последствия для всего подъезда.")}<div>${b.votes.length ? b.votes.map(renderVote).join("") : '<div class="empty">Открытых голосований нет.</div>'}</div>${section("Цель недели", "Совместный прогресс сохраняется для подъезда.")}<div>${b.goals.map((g) => `<div class="card"><h3>${esc(g.title)}</h3><div class="progress-track"><i style="width:${Math.min(100, (Number(g.progress) / Number(g.target)) * 100)}%"></i></div><p>${g.progress}/${g.target}</p></div>`).join("")}</div>`;
   bindBuilding();
 }
 function renderVote(v) {
@@ -1532,29 +1580,37 @@ async function buildingAction(action) {
     );
   }
 }
-async function storageAction(itemId, direction) {
+async function storageAction(itemId, direction, quantity = null) {
+  const available = direction === "withdraw"
+    ? Number(state.v2?.building?.storage?.find((x) => x.item_id === itemId)?.quantity || 0)
+    : Number(state.base?.inventory?.find((x) => x.item_id === itemId)?.quantity || 0);
+  if (quantity == null) {
+    if (available <= 0) return toast(direction === "withdraw" ? "На складе этот предмет уже закончился" : "У вас нет этого предмета", "warning");
+    const max = Math.min(available, 20);
+    openSheet(direction === "withdraw" ? "Забрать со склада" : "Положить на склад", itemName(itemId), `<div class="storage-transfer"><div class="storage-transfer-item"><span class="icon">${itemIcon(itemId)}</span><div><b>${esc(itemName(itemId))}</b><small>Доступно: ${available}</small></div></div><label>Количество<input id="storageQuantity" type="number" inputmode="numeric" min="1" max="${max}" value="1"></label><div class="quantity-quick">${[1,3,5,10].filter((x)=>x<=max).map((x)=>`<button class="secondary" data-storage-qty="${x}">${x}</button>`).join("")}</div><button class="primary full" id="storageConfirm">${direction === "withdraw" ? "Забрать в инвентарь" : "Передать соседям"}</button></div>`);
+    $$('[data-storage-qty]', $("#sheetBody")).forEach((button) => button.onclick = () => { $("#storageQuantity").value = button.dataset.storageQty; });
+    $("#storageConfirm").onclick = () => storageAction(itemId, direction, Math.max(1, Math.min(max, Number($("#storageQuantity").value || 1))));
+    return;
+  }
+  const confirm = $("#storageConfirm");
+  if (confirm) { confirm.disabled = true; confirm.textContent = "Проверяем склад…"; }
   try {
-    await api("/api/building/storage", {
+    const result = await api("/api/building/storage", {
       method: "POST",
-      body: JSON.stringify({
-        itemId,
-        quantity: 1,
-        direction,
-        operationId: opId(),
-      }),
+      body: JSON.stringify({ itemId, quantity, direction, operationId: opId() }),
     });
     closeSheet();
-    toast(
-      direction === "deposit"
-        ? "Предмет оставлен соседям"
-        : "Предмет забран со склада",
-    );
-    await bootstrap();
-    setTab("building");
+    void audioEngine.cue(direction === "deposit" ? "itemPlace" : "itemPickup");
+    toast(direction === "deposit" ? `Передано на склад: ${quantity}` : `Получено со склада: ${quantity}`, "success");
+    await bootstrap({ quiet: true });
+    state.tab = "building";
+    renderBuilding();
   } catch (e) {
-    toast(e.message);
+    toast(e.message, "error");
+    if (confirm?.isConnected) { confirm.disabled = false; confirm.textContent = direction === "withdraw" ? "Забрать в инвентарь" : "Передать соседям"; }
   }
 }
+
 async function castVote(id, optionKey) {
   try {
     await api(`/api/building/votes/${id}`, {

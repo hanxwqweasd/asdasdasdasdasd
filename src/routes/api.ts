@@ -15,6 +15,7 @@ import { changeInventory } from '../services/economy.js';
 import { executeIdempotent, operationKey, assertActionLimit } from '../security/anti-abuse.js';
 import { assertCanCommunicate, moderateText } from '../services/moderation.js';
 import { recordBehavior } from '../services/storylines.js';
+import { makeRoomObservation, makeSceneObservation } from '../services/room-observation.js';
 
 
 function userOf(request: FastifyRequest) {
@@ -73,6 +74,51 @@ export async function apiRoutes(app: FastifyInstance): Promise<void> {
       referralLink: `https://t.me/${config.BOT_USERNAME}?start=${profile.rows[0].referral_code}`,
       economy: { houseMarks: Number(profile.rows[0].house_marks ?? 0) }
     };
+  });
+
+  app.post('/api/scenes/observe', async request => {
+    const user = userOf(request);
+    await assertActionLimit(user.id, 'scene_observe', 30, 60);
+    const body = z.object({
+      sceneKey: z.string().trim().min(1).max(80),
+      action: z.enum(['listen','inspect']),
+      operationId: z.string().optional()
+    }).parse(request.body);
+    const key = operationKey(request, body);
+    return executeIdempotent(user.id, 'scene-observe', key, body, async () => {
+      const count = await pool.query(`SELECT COUNT(*)::int count FROM room_observations WHERE expedition_id IS NULL AND user_id=$1 AND room_id=$2 AND action=$3 AND created_at>=CURRENT_DATE`, [user.id, body.sceneKey, body.action]);
+      const attempt = Number(count.rows[0]?.count ?? 0);
+      const observation = makeSceneObservation(body.sceneKey, body.action, `${user.id}:${new Date().toISOString().slice(0,10)}`, attempt);
+      await pool.query(`INSERT INTO room_observations(id,expedition_id,user_id,room_id,action,variant_key,payload) VALUES($1,NULL,$2,$3,$4,$5,$6)`, [crypto.randomUUID(), user.id, body.sceneKey, body.action, `${observation.key}:${attempt}`, JSON.stringify(observation)]);
+      await pool.query(`INSERT INTO analytics_events(user_id,event_name,properties) VALUES($1,'scene_observe',$2)`, [user.id, JSON.stringify({sceneKey:body.sceneKey,action:body.action,attempt,variant:observation.key})]);
+      return { observation, attemptsToday: attempt + 1 };
+    });
+  });
+
+  app.post('/api/expeditions/:id/observe', async request => {
+    await assertEnabled('expeditions_enabled', 'Лифт временно закрыт администрацией дома');
+    const user = userOf(request);
+    await assertActionLimit(user.id, 'expedition_observe', 30, 60);
+    const params = z.object({ id: z.string().uuid() }).parse(request.params);
+    const body = z.object({ action: z.enum(['listen','inspect']), operationId: z.string().optional() }).parse(request.body);
+    const key = operationKey(request, body);
+    return executeIdempotent(user.id, 'expedition-observe', key, {...body,expeditionId:params.id}, async () => withTransaction(async client => {
+      const found = await client.query(`SELECT * FROM expeditions WHERE id=$1 AND user_id=$2 FOR UPDATE`, [params.id, user.id]);
+      const expedition = found.rows[0];
+      if (!expedition || expedition.status !== 'active') throw new AppError('Вылазка уже завершена', 409, 'EXPEDITION_FINISHED');
+      const room = currentRoom(expedition.state, expedition.room_index);
+      if (!room) throw new AppError('Комната не найдена', 409, 'ROOM_NOT_FOUND');
+      const previous = await client.query(`SELECT COUNT(*)::int count FROM room_observations WHERE expedition_id=$1 AND user_id=$2 AND room_id=$3 AND action=$4`, [params.id,user.id,room.id,body.action]);
+      const attempt = Number(previous.rows[0]?.count ?? 0);
+      if (attempt >= 3) throw new AppError(body.action === 'listen' ? 'Вы уже услышали всё, что комната готова выдать' : 'Вы уже осмотрели все доступные детали', 409, 'ROOM_OBSERVATION_EXHAUSTED');
+      const observation = makeRoomObservation(room, body.action, `${expedition.seed}:${user.id}:${expedition.room_index}`, attempt);
+      const nextState = structuredClone(expedition.state) as ExpeditionState;
+      if (observation.clueAwarded) nextState.clues = Math.max(0, Number(nextState.clues ?? 0) + 1);
+      await client.query(`INSERT INTO room_observations(id,expedition_id,user_id,room_id,action,variant_key,payload) VALUES($1,$2,$3,$4,$5,$6,$7)`, [crypto.randomUUID(),params.id,user.id,room.id,body.action,observation.key,JSON.stringify(observation)]);
+      await client.query(`UPDATE expeditions SET state=$2 WHERE id=$1`, [params.id,nextState]);
+      await client.query(`INSERT INTO analytics_events(user_id,event_name,properties) VALUES($1,'room_observe',$2)`, [user.id,JSON.stringify({expeditionId:params.id,roomId:room.id,action:body.action,attempt,variant:observation.key,clueAwarded:observation.clueAwarded})]);
+      return { observation, attemptsRemaining: 2 - attempt, state: nextState };
+    }));
   });
 
   app.post('/api/profile/intro-seen', async request => {

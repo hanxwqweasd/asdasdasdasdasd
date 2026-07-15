@@ -19,7 +19,7 @@ test("final client shell exposes app identity and Telegram-safe assets", async (
   assert.match(html, /manifest\.webmanifest/);
   assert.match(html, /id="bootScene"/);
   assert.match(html, /floorTransition/);
-  assert.match(app, /const APP_VERSION = "4\.1\.0"/);
+  assert.match(app, /const APP_VERSION = "4\.2\.0"/);
   assert.match(app, /class HouseAudioEngine/);
   assert.match(manifest, /Восьмого этажа нет/);
   assert.match(icons, /symbol id="elevator"/);
@@ -46,7 +46,7 @@ test("cinematic audio pack contains high-quality spatial layers and tactile cues
     text("public/audio/manifest.json").then(JSON.parse),
     text("public/app.js"),
   ]);
-  assert.equal(manifest.version,"4.1.0");
+  assert.equal(manifest.version,"4.2.0");
   assert.equal(manifest.sampleRate,48_000);
   assert.ok(manifest.assets.length >= 90);
   assert.match(app, /const SOUND_CUES/);
