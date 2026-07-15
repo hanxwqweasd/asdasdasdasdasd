@@ -20,7 +20,7 @@ import { adminV2Routes } from './admin/v2-routes.js';
 import { bootstrapAdmin } from './admin/auth.js';
 import { startBroadcastWorker } from './admin/broadcast-worker.js';
 import { createRealtimeServer } from './realtime/coop.js';
-import { closeRedis,getRedis,redisHealth } from './redis.js';
+import { closeRedis,getRedis,redisDiagnostic,redisHealth } from './redis.js';
 import { captureException,flushSentry,initSentry } from './observability/sentry.js';
 import { httpDuration,registry } from './observability/metrics.js';
 import { getSetting } from './settings.js';
@@ -82,13 +82,22 @@ if(config.PRE_MIGRATION_BACKUP){
 }
 await runMigrations();
 await bootstrapAdmin();
-const redis=await getRedis();if(config.NODE_ENV==='production'&&config.REDIS_REQUIRED_IN_PRODUCTION&&!redis)throw new Error('REDIS_URL is required in production. Add Railway Redis and reference REDIS_URL.');
+const redis=await getRedis();
+if(!redis){
+  app.log.warn({redis:redisDiagnostic(),required:config.REDIS_REQUIRED_IN_PRODUCTION},'Redis unavailable; starting in degraded mode. Realtime, matchmaking and distributed presence are disabled.');
+}
 
-app.get('/health',async(_request,reply)=>{await pool.query('SELECT 1');const redisOk=await redisHealth();if(config.NODE_ENV==='production'&&config.REDIS_REQUIRED_IN_PRODUCTION&&!redisOk)return reply.code(503).send({ok:false,database:true,redis:false,name:'eighth-floor-v2'});return{ok:true,database:true,redis:redisOk,name:'eighth-floor-v2',version:config.APP_VERSION};});
+app.get('/health',async()=>{await pool.query('SELECT 1');const redisOk=await redisHealth();return{ok:true,database:true,redis:redisOk,degraded:!redisOk,disabledFeatures:redisOk?[]:['realtime_coop','matchmaking','distributed_presence'],name:'eighth-floor-v2',version:config.APP_VERSION};});
+app.get('/ready',async(_request,reply)=>{await pool.query('SELECT 1');const redisOk=await redisHealth();if(config.NODE_ENV==='production'&&config.REDIS_REQUIRED_IN_PRODUCTION&&!redisOk)return reply.code(503).send({ready:false,database:true,redis:false,redisDiagnostic:redisDiagnostic()});return{ready:true,database:true,redis:redisOk};});
+app.get('/setup/redis',async(_request,reply)=>{const diagnostic=redisDiagnostic();const redisKeys=['REDIS_URL','REDIS_PRIVATE_URL','REDIS_PUBLIC_URL','REDIS_TLS_URL','REDIS_URI','REDIS_CONNECTION_STRING','REDISHOST','REDISPORT','REDISUSER','REDISPASSWORD','REDIS_HOST','REDIS_PORT','REDIS_USER','REDIS_PASSWORD'];const present=redisKeys.filter(key=>typeof process.env[key]==='string'&&process.env[key]!.trim().length>0);return reply.type('text/html; charset=utf-8').send(`<!doctype html><html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Настройка Redis</title><style>body{margin:0;background:#0b0d0e;color:#eee;font:16px system-ui;display:grid;place-items:center;min-height:100vh}.card{max-width:760px;margin:24px;padding:28px;background:#17191a;border:1px solid #35312b;border-radius:16px;box-shadow:0 22px 80px #0008}h1{font-size:28px}code,pre{background:#08090a;border:1px solid #302d28;border-radius:8px;padding:3px 7px;color:#d8c39d}pre{padding:14px;overflow:auto}.bad{color:#ff9a86}.ok{color:#9dd7aa}li{margin:8px 0}</style></head><body><main class="card"><h1>Redis ${diagnostic.connected?'подключён':'не подключён'}</h1><p class="${diagnostic.connected?'ok':'bad'}">Основной сервер работает. Без Redis временно выключены realtime-кооператив, matchmaking и распределённое присутствие.</p><ol><li>Добавьте Redis в то же Railway-окружение.</li><li>Сервис игры → Variables → Add Reference Variable.</li><li>Выберите Redis → REDIS_URL.</li><li>Создайте новый Deploy.</li></ol><pre>REDIS_URL=\${{Redis.REDIS_URL}}</pre><p>Обнаруженные переменные: <code>${present.length?present.join(', '):'нет'}</code></p><p>Последняя ошибка: <code>${diagnostic.lastError??'нет'}</code></p><p>Проверка: <code>/health</code></p></main></body></html>`);});
 app.get('/metrics',async(request,reply)=>{if(!config.ENABLE_METRICS)return reply.code(404).send();if(config.METRICS_TOKEN&&request.headers.authorization!==`Bearer ${config.METRICS_TOKEN}`)return reply.code(401).send('unauthorized');return reply.type(registry.contentType).send(await registry.metrics());});
 
 await apiRoutes(app);await v2Routes(app);await telegramWebhookRoutes(app);await adminRoutes(app);await adminV2Routes(app);
 const realtime=redis?await createRealtimeServer(app.server,app.log):null;
+
+if(!redis){
+  app.get('/socket.io/socket.io.js',async(_request,reply)=>reply.type('application/javascript; charset=utf-8').send(`(()=>{window.__REDIS_REALTIME_AVAILABLE__=false;window.io=function(){const handlers={};const socket={connected:false,on(event,fn){(handlers[event]??=[]).push(fn);return socket;},timeout(){return socket;},emit(_event,_payload,callback){if(typeof callback==='function')callback(new Error('REDIS_UNAVAILABLE'));return socket;},disconnect(){return socket;}};queueMicrotask(()=>{for(const fn of handlers.connect_error??[])fn(new Error('Realtime временно недоступен: Redis не подключён'));});return socket;};})();`));
+}
 
 const publicDir=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'../public');
 const mime:Record<string,string>={'.html':'text/html; charset=utf-8','.css':'text/css; charset=utf-8','.js':'application/javascript; charset=utf-8','.svg':'image/svg+xml','.wav':'audio/wav','.ogg':'audio/ogg','.webm':'audio/webm','.png':'image/png','.webp':'image/webp','.ico':'image/x-icon'};

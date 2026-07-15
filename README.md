@@ -182,7 +182,7 @@ https://ваш-домен.up.railway.app/admin/
 NODE_ENV=production
 DATABASE_URL=${{Postgres.DATABASE_URL}}
 REDIS_URL=${{Redis.REDIS_URL}}
-REDIS_REQUIRED_IN_PRODUCTION=true
+REDIS_REQUIRED_IN_PRODUCTION=false
 
 BOT_TOKEN=токен_бота
 BOT_USERNAME=имя_бота_без_@
@@ -287,3 +287,9 @@ load-tests/                HTTP, WebSocket и co-op тесты
 The Railway runtime image installs `postgresql-client-18` from the official PostgreSQL APT repository. This is required because `pg_dump` refuses to dump a server whose major version is newer than the client.
 
 `PRE_MIGRATION_BACKUP_REQUIRED=false` keeps startup available if an external backup destination or `pg_dump` temporarily fails. Set it to `true` only when a failed pre-migration backup must block every deployment.
+
+### Запуск без Redis
+
+Если reference-переменная Redis ещё не настроена, приложение запускается в деградированном режиме: одиночная игра, PostgreSQL, магазин, Telegram Stars и админ-панель остаются доступны. Временно отключаются realtime-кооператив, matchmaking и распределённое присутствие. Диагностика доступна по `/setup/redis`. После добавления `REDIS_URL` достаточно выполнить новый Deploy.
+
+`/health` всегда проверяет основной процесс и PostgreSQL. Строгая readiness-проверка находится на `/ready`; при `REDIS_REQUIRED_IN_PRODUCTION=true` она возвращает 503 до подключения Redis.

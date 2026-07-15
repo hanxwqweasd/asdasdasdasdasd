@@ -10,7 +10,7 @@ function encode(value: string): string { return encodeURIComponent(value); }
 function connectionUrl(env: NodeJS.ProcessEnv, kind: 'postgres' | 'redis'): string | undefined {
   const candidates = kind === 'postgres'
     ? [env.DATABASE_URL, env.DATABASE_PRIVATE_URL, env.DATABASE_PUBLIC_URL, env.POSTGRES_URL, env.POSTGRESQL_URL, env.POSTGRES_DATABASE_URL]
-    : [env.REDIS_URL, env.REDIS_PRIVATE_URL, env.REDIS_PUBLIC_URL];
+    : [env.REDIS_URL, env.REDIS_PRIVATE_URL, env.REDIS_PUBLIC_URL, env.REDIS_TLS_URL, env.REDIS_URI, env.REDIS_CONNECTION_STRING];
   for (const candidate of candidates) { const value = optionalEnv(candidate); if (value) return value; }
   if (kind === 'redis') {
     const host=optionalEnv(env.REDISHOST)??optionalEnv(env.REDIS_HOST);
