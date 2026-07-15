@@ -23,6 +23,7 @@ const NAV = [
   ['broadcasts', 'Рассылки', 'Ⅴ', 'Сообщения жильцам'],
   ['operations', 'Операции', 'Ⅵ', 'Вылазки и модерация'],
   ['v2', 'V2 · LiveOps', 'Ⅹ', 'Realtime, аналитика и истории'],
+  ['v4', 'V4 · Дом живёт', 'Ⅺ', 'Следы, голоса, дела и Ночь 00:08'],
   ['settings', 'Настройки дома', 'Ⅶ', 'Аварийные переключатели'],
   ['admins', 'Администраторы', 'Ⅷ', 'Роли и доступ'],
   ['audit', 'Журнал действий', 'Ⅸ', 'История изменений']
@@ -31,7 +32,7 @@ const NAV = [
 
 const NAV_REQUIRED = {
   dashboard: 'dashboard:read', users: 'users:read', purchases: 'purchases:read', content: 'content:read',
-  broadcasts: 'broadcasts:read', operations: 'operations:read', v2: 'operations:read', settings: 'settings:read', admins: 'admins:read', audit: 'audit:read'
+  broadcasts: 'broadcasts:read', operations: 'operations:read', v2: 'operations:read', v4: 'operations:read', settings: 'settings:read', admins: 'admins:read', audit: 'audit:read'
 };
 
 const viewMeta = Object.fromEntries(NAV.map(([id, title, , kicker]) => [id, { title, kicker }]));
@@ -172,6 +173,7 @@ async function renderCurrent() {
       broadcasts: renderBroadcasts,
       operations: renderOperations,
       v2: renderV2,
+      v4: renderV4,
       settings: renderSettings,
       admins: renderAdmins,
       audit: renderAudit
@@ -392,6 +394,41 @@ async function renderV2Backups(){const d=await api('/v2/backups');$('#v2Body').i
 npm run backup:restore -- /backups/file.dump
 npm run export:data</pre></div>`;}
 async function createV2Backup(){await api('/v2/backups',{method:'POST',body:{}});toast('Резервная копия создана');await renderV2Backups();}
+
+async function renderV4(){
+  const d=await api('/v4/overview');
+  state.liveOpsCache.v4=d;
+  const caseCount=(d.cases||[]).reduce((n,x)=>n+Number(x.count||0),0);
+  const content=(d.content||[]).map(x=>`<span class="item-chip">${escapeHtml(x.content_type)} <b>${fmtNumber(x.count)}</b></span>`).join('');
+  $('#content').innerHTML=`
+    <div class="metric-grid">
+      ${metric('Живые следы',d.traces?.total||0,`${d.traces?.today||0} за сутки`)}
+      ${metric('Дела для чатов',caseCount,'общие расследования')}
+      ${metric('Голоса на проверке',(d.voices||[]).filter(x=>x.status==='pending').length,'с согласием жильцов')}
+      ${metric('Комнаты жильцов',(d.rooms||[]).filter(x=>x.status==='review').length,'ожидают модерации')}
+    </div>
+    <div class="panel-grid">
+      <article class="panel span-2"><div class="panel-header"><div><h2>Контент релиза</h2><p>Месячный запас комнат, дел, глав и интерьеров</p></div>${button('Создать Ночь 00:08','v4-live-new','','primary')}</div><div class="item-chips">${content||'<span class="muted">Нет данных</span>'}</div></article>
+      <article class="panel"><h2>Отношения</h2><div class="metric-inline"><strong>${fmtNumber(d.relationships?.links)}</strong><span>связей</span></div><p>Среднее доверие: ${escapeHtml(d.relationships?.avg_trust||0)} · спасений: ${fmtNumber(d.relationships?.rescues)} · оставлений: ${fmtNumber(d.relationships?.abandonments)}</p></article>
+      <article class="panel"><h2>Управляющий</h2><p>${(d.antagonists||[]).length?`${d.antagonists.length} недельных циклов. Текущий режим: ${escapeHtml(d.antagonists[0]?.mode||'system')}`:'Цикл создастся при первом входе жильца.'}</p></article>
+    </div>
+    <section class="panel"><div class="panel-header"><div><h2>Голоса настоящих соседей</h2><p>Короткие фразы публикуются только после ручной проверки</p></div></div>
+      <div class="table-wrap"><table><thead><tr><th>Жилец</th><th>Фраза</th><th>Формат</th><th>Длина</th><th>Статус</th><th></th></tr></thead><tbody>${(d.voices||[]).map(v=>`<tr><td>${escapeHtml(v.first_name||v.username||'—')}</td><td>${escapeHtml(v.phrase_key)}</td><td>${escapeHtml(v.mime_type)}</td><td>${Math.round(Number(v.duration_ms)/100)/10} с</td><td>${statusBadge(v.status)}</td><td>${v.status==='pending'?`${button('Одобрить','v4-voice-review',v.id,'primary','data-status="approved"')} ${button('Отклонить','v4-voice-review',v.id,'danger','data-status="rejected"')}`:'—'}</td></tr>`).join('')||'<tr><td colspan="6" class="muted">Записей нет</td></tr>'}</tbody></table></div>
+    </section>
+    <section class="panel"><div class="panel-header"><div><h2>Комнаты жильцов</h2><p>Ограниченный конструктор и безопасная публикация</p></div></div>
+      <div class="table-wrap"><table><thead><tr><th>Название</th><th>Автор</th><th>Статус</th><th>Прохождения</th><th>Лайки</th><th></th></tr></thead><tbody>${(d.rooms||[]).map(r=>`<tr><td><strong>${escapeHtml(r.title)}</strong><span class="subline code">${escapeHtml(r.slug)}</span></td><td>${escapeHtml(r.author_name||r.author_id)}</td><td>${statusBadge(r.status)}</td><td>${fmtNumber(r.plays)}</td><td>${fmtNumber(r.likes)}</td><td>${r.status==='review'?`${button('Опубликовать','v4-room-review',r.id,'primary','data-status="published"')} ${button('Отклонить','v4-room-review',r.id,'danger','data-status="rejected"')}`:r.status==='published'?button('В архив','v4-room-review',r.id,'ghost','data-status="archived"'):'—'}</td></tr>`).join('')||'<tr><td colspan="6" class="muted">Комнат нет</td></tr>'}</tbody></table></div>
+    </section>
+    <div class="panel-grid">
+      <article class="panel"><h2>Ночи 00:08</h2>${compactTable((d.nights||[]).slice(0,10),[['title','Событие'],['phase','Фаза'],['global_progress','Прогресс'],['global_target','Цель'],['starts_at','Начало']],row=>({...row,phase:statusBadge(row.phase),starts_at:fmtDate(row.starts_at)}),['phase'])}</article>
+      <article class="panel"><h2>Emoji-статусы</h2>${(d.emoji||[]).map(e=>`<div class="list-card"><div><strong>${escapeHtml(e.title)}</strong><span class="subline">${escapeHtml(e.key)} · ${e.custom_emoji_id?'настроен':'нужен custom emoji id'}</span></div>${button('Настроить','v4-emoji-edit',e.key)}</div>`).join('')}</article>
+    </div>
+    <section class="panel"><div class="panel-header"><div><h2>Поддержка платежей</h2><p>/paysupport, восстановление выдачи и обращения из истории покупок</p></div></div>${compactTable(d.paymentSupport||[],[['first_name','Игрок'],['sku','Покупка'],['body','Обращение'],['status','Статус'],['created_at','Дата']],row=>({...row,status:statusBadge(row.status),created_at:fmtDate(row.created_at)}),['status'])}<div class="stack">${(d.paymentSupport||[]).filter(x=>x.status!=='resolved').slice(0,12).map(x=>`<div class="list-card"><div><strong>${escapeHtml(x.first_name||x.user_id)}</strong><p>${escapeHtml(x.body)}</p></div>${button('Решено','v4-payment-resolve',x.id,'primary')}</div>`).join('')}</div></section>`;
+}
+async function reviewV4Voice(id,status){await api(`/v4/voices/${id}`,{method:'PATCH',body:{status}});toast('Статус голосовой записи изменён');await renderV4();}
+async function reviewV4Room(id,status){let note='';if(status==='rejected')note=prompt('Причина отклонения','Нужно доработать сцену и формулировки.')||'';await api(`/v4/user-rooms/${id}`,{method:'PATCH',body:{status,note}});toast('Статус комнаты изменён');await renderV4();}
+async function createV4LiveNight(){const start=new Date(Date.now()+24*3600000);start.setMinutes(8,0,0);openModal({title:'Запланировать Ночь 00:08',kicker:'Общее живое событие',submitText:'Создать',body:`<form class="form-grid"><label class="wide">Название<input name="title" value="Ночь 00:08" required minlength="3"></label><label>Начало<input name="startsAt" type="datetime-local" value="${start.toISOString().slice(0,16)}" required></label><label>Продолжительность, минут<input name="durationMinutes" type="number" value="40" min="10" max="180"></label><label>Общая цель<input name="target" type="number" value="1000" min="10"></label><label class="wide">Конфигурация JSON<textarea name="config">{"blackout":true,"specialRooms":["registry","manager","clock"]}</textarea></label></form>`,onSubmit:async root=>{const f=formObject(root);await api('/v4/live-nights',{method:'POST',body:{title:f.title,startsAt:new Date(f.startsAt).toISOString(),durationMinutes:Number(f.durationMinutes),target:Number(f.target),config:JSON.parse(f.config)}});closeModal();toast('Событие запланировано');await renderV4();}});}
+async function editV4Emoji(key){const item=state.liveOpsCache.v4?.emoji?.find(x=>x.key===key);openModal({title:'Emoji-статус Telegram',kicker:key,submitText:'Сохранить',body:`<form class="form-grid"><label class="wide">Custom Emoji ID<input name="customEmojiId" value="${attr(item?.custom_emoji_id||'')}"></label><label>Длительность, секунд<input name="durationSeconds" type="number" value="${item?.duration_seconds||86400}" min="60"></label><label class="check-row"><input name="active" type="checkbox" ${item?.active?'checked':''}> Активен</label></form>`,onSubmit:async root=>{const f=formObject(root);await api(`/v4/emoji/${encodeURIComponent(key)}`,{method:'PATCH',body:{customEmojiId:f.customEmojiId||null,durationSeconds:Number(f.durationSeconds)||null,active:Boolean(f.active)}});closeModal();toast('Emoji-статус сохранён');await renderV4();}});}
+async function resolveV4Payment(id){await api(`/v4/payment-support/${id}`,{method:'PATCH',body:{status:'resolved'}});toast('Обращение закрыто');await renderV4();}
 async function renderV2Observability(){const d=await api('/v2/observability');$('#v2Body').innerHTML=`<div class="metric-grid">${metric('DB connections',d.database.connections)}${metric('Размер базы',Math.round(Number(d.database.database_bytes)/1024/1024),'MB')}${metric('Redis',d.redis?.ok?1:0,d.redis?.ok?'доступен':'ошибка')}</div><div class="panel-grid"><article class="panel"><h2>Очередь рассылок</h2>${compactTable(d.queues,[['status','Статус'],['count','Количество']])}</article><article class="panel"><h2>Платежи за 24 часа</h2>${compactTable(d.payments,[['status','Статус'],['count','Количество']])}</article><article class="panel span-2"><h2>Prometheus metrics</h2><pre class="code" style="max-height:420px;overflow:auto">${escapeHtml(d.metrics)}</pre></article></div>`;}
 
 $('#loginForm').addEventListener('submit', async event => {
@@ -472,6 +509,11 @@ async function handleAction(action, id, node) {
   if (action === 'broadcast-pause') return broadcastAction(id,'pause');
   if (action === 'broadcast-cancel') return broadcastAction(id,'cancel');
   if (action === 'operations-tab') { state.operationsTab=id;return renderOperations(); }
+  if (action === 'v4-voice-review') return reviewV4Voice(id,node.dataset.status);
+  if (action === 'v4-room-review') return reviewV4Room(id,node.dataset.status);
+  if (action === 'v4-live-new') return createV4LiveNight();
+  if (action === 'v4-emoji-edit') return editV4Emoji(id);
+  if (action === 'v4-payment-resolve') return resolveV4Payment(id);
   if (action === 'v2-tab') { state.liveOpsTab=id;return renderV2(); }
   if (action === 'v2-backup') return createV2Backup();
   if (action === 'v2-coop-cancel') return cancelV2Coop(id);

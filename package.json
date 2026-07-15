@@ -1,6 +1,6 @@
 {
   "name": "eighth-floor-telegram-miniapp",
-  "version": "3.0.0",
+  "version": "4.0.0",
   "private": true,
   "type": "module",
   "engines": {
@@ -18,7 +18,8 @@
     "export:data": "sh scripts/export-data.sh",
     "load:http": "node load-tests/http.mjs",
     "load:socket": "node load-tests/socket.mjs",
-    "load:coop": "node load-tests/coop.mjs"
+    "load:coop": "node load-tests/coop.mjs",
+    "load:spectator": "node load-tests/spectator.mjs"
   },
   "dependencies": {
     "@fastify/cors": "^10.0.1",

@@ -1,6 +1,7 @@
 import { pool } from './db.js';
 import { ROOM_TEMPLATES, SHOP } from './game/catalog.js';
 import { runV2Migrations } from './v2/migrations.js';
+import { runV4Migrations } from './v4/migrations.js';
 
 export const migrationStatements = [
 `CREATE TABLE IF NOT EXISTS users (
@@ -239,4 +240,5 @@ export async function runMigrations(): Promise<void> {
   await pool.query(seedEventSql);
   await seedContent();
   await runV2Migrations();
+  await runV4Migrations();
 }

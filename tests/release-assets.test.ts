@@ -19,7 +19,7 @@ test("final client shell exposes app identity and Telegram-safe assets", async (
   assert.match(html, /manifest\.webmanifest/);
   assert.match(html, /id="bootScene"/);
   assert.match(html, /floorTransition/);
-  assert.match(app, /const APP_VERSION = "3\.0\.0"/);
+  assert.match(app, /const APP_VERSION = "4\.0\.0"/);
   assert.match(app, /class HouseAudioEngine/);
   assert.match(manifest, /Восьмого этажа нет/);
   assert.match(icons, /symbol id="elevator"/);

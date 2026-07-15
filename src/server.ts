@@ -12,14 +12,17 @@ import { pool } from './db.js';
 import { runMigrations } from './migrations.js';
 import { apiRoutes } from './routes/api.js';
 import { v2Routes } from './routes/v2.js';
+import { v4Routes } from './routes/v4.js';
 import { telegramWebhookRoutes } from './routes/telegram-webhook.js';
 import { configureTelegram } from './telegram.js';
 import { AppError } from './errors.js';
 import { adminRoutes } from './admin/routes.js';
 import { adminV2Routes } from './admin/v2-routes.js';
+import { adminV4Routes } from './admin/v4-routes.js';
 import { bootstrapAdmin } from './admin/auth.js';
 import { startBroadcastWorker } from './admin/broadcast-worker.js';
 import { createRealtimeServer } from './realtime/coop.js';
+import { startV4Worker } from './v4/worker.js';
 import { closeRedis,getRedis,redisDiagnostic,redisHealth } from './redis.js';
 import { captureException,flushSentry,initSentry } from './observability/sentry.js';
 import { httpDuration,registry } from './observability/metrics.js';
@@ -54,7 +57,7 @@ if(!config.DATABASE_URL){
   const present=postgresKeys.filter(key=>typeof process.env[key]==='string'&&String(process.env[key]).trim().length>0);
   const missing=['DATABASE_URL or PGHOST + PGUSER + PGDATABASE'];
   app.log.error({presentPostgresVariables:present,missing},'PostgreSQL is not connected; starting setup-safe mode');
-  const payload={ok:true,setupRequired:true,database:false,redis:await redisHealth(),name:'eighth-floor-v2',version:config.APP_VERSION,missing,presentPostgresVariables:present};
+  const payload={ok:true,setupRequired:true,database:false,redis:await redisHealth(),name:'eighth-floor-v4',version:config.APP_VERSION,missing,presentPostgresVariables:present};
   app.get('/health',async()=>payload);
   app.get('/setup-status',async()=>payload);
   const setupHtml=`<!doctype html><html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Настройка PostgreSQL</title><style>body{margin:0;background:#090b0d;color:#e7e1d6;font:16px/1.55 system-ui,sans-serif;display:grid;min-height:100vh;place-items:center}.card{max-width:720px;margin:24px;padding:28px;border:1px solid #39342c;background:#121416;border-radius:18px;box-shadow:0 22px 80px #0008}h1{font-size:28px;margin:0 0 14px}code,pre{background:#08090a;border:1px solid #302d28;border-radius:8px;padding:3px 7px;color:#d8c39d}pre{padding:14px;overflow:auto}.bad{color:#ff9a86}.ok{color:#9dd7aa}li{margin:8px 0}</style></head><body><main class="card"><h1>Игра развёрнута, но PostgreSQL не подключён</h1><p class="bad">Контейнер больше не падает. Игровые API временно отключены до появления переменной базы.</p><ol><li>В Railway добавьте сервис <b>PostgreSQL</b> в это же окружение.</li><li>Откройте сервис игры → <b>Variables</b> → <b>Add Reference Variable</b>.</li><li>Выберите PostgreSQL → <code>DATABASE_URL</code>.</li><li>Убедитесь, что в сервисе игры создана ссылка вида:</li></ol><pre>DATABASE_URL=\${{Postgres.DATABASE_URL}}</pre><p>Если сервис называется иначе, Railway подставит его точное имя автоматически. Затем выполните новый Deploy.</p><p>Обнаруженные PostgreSQL-переменные: <code>${present.length?present.join(', '):'нет'}</code></p><p class="ok">После корректной привязки этот же архив автоматически запустит полную игру, миграции и админ-панель.</p></main></body></html>`;
@@ -87,13 +90,13 @@ if(!redis){
   app.log.warn({redis:redisDiagnostic(),required:config.REDIS_REQUIRED_IN_PRODUCTION},'Redis unavailable; starting in degraded mode. Realtime, matchmaking and distributed presence are disabled.');
 }
 
-app.get('/health',async()=>{await pool.query('SELECT 1');const redisOk=await redisHealth();return{ok:true,database:true,redis:redisOk,degraded:!redisOk,disabledFeatures:redisOk?[]:['realtime_coop','matchmaking','distributed_presence'],name:'eighth-floor-v2',version:config.APP_VERSION};});
+app.get('/health',async()=>{await pool.query('SELECT 1');const redisOk=await redisHealth();return{ok:true,database:true,redis:redisOk,degraded:!redisOk,disabledFeatures:redisOk?[]:['realtime_coop','matchmaking','distributed_presence'],name:'eighth-floor-v4',version:config.APP_VERSION};});
 app.get('/ready',async(_request,reply)=>{await pool.query('SELECT 1');const redisOk=await redisHealth();if(config.NODE_ENV==='production'&&config.REDIS_REQUIRED_IN_PRODUCTION&&!redisOk)return reply.code(503).send({ready:false,database:true,redis:false,redisDiagnostic:redisDiagnostic()});return{ready:true,database:true,redis:redisOk};});
 app.get('/setup/redis',async(_request,reply)=>{const diagnostic=redisDiagnostic();const redisKeys=['REDIS_URL','REDIS_PRIVATE_URL','REDIS_PUBLIC_URL','REDIS_TLS_URL','REDIS_URI','REDIS_CONNECTION_STRING','REDISHOST','REDISPORT','REDISUSER','REDISPASSWORD','REDIS_HOST','REDIS_PORT','REDIS_USER','REDIS_PASSWORD'];const present=redisKeys.filter(key=>typeof process.env[key]==='string'&&process.env[key]!.trim().length>0);return reply.type('text/html; charset=utf-8').send(`<!doctype html><html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Настройка Redis</title><style>body{margin:0;background:#0b0d0e;color:#eee;font:16px system-ui;display:grid;place-items:center;min-height:100vh}.card{max-width:760px;margin:24px;padding:28px;background:#17191a;border:1px solid #35312b;border-radius:16px;box-shadow:0 22px 80px #0008}h1{font-size:28px}code,pre{background:#08090a;border:1px solid #302d28;border-radius:8px;padding:3px 7px;color:#d8c39d}pre{padding:14px;overflow:auto}.bad{color:#ff9a86}.ok{color:#9dd7aa}li{margin:8px 0}</style></head><body><main class="card"><h1>Redis ${diagnostic.connected?'подключён':'не подключён'}</h1><p class="${diagnostic.connected?'ok':'bad'}">Основной сервер работает. Без Redis временно выключены realtime-кооператив, matchmaking и распределённое присутствие.</p><ol><li>Добавьте Redis в то же Railway-окружение.</li><li>Сервис игры → Variables → Add Reference Variable.</li><li>Выберите Redis → REDIS_URL.</li><li>Создайте новый Deploy.</li></ol><pre>REDIS_URL=\${{Redis.REDIS_URL}}</pre><p>Обнаруженные переменные: <code>${present.length?present.join(', '):'нет'}</code></p><p>Последняя ошибка: <code>${diagnostic.lastError??'нет'}</code></p><p>Проверка: <code>/health</code></p></main></body></html>`);});
 app.get('/metrics',async(request,reply)=>{if(!config.ENABLE_METRICS)return reply.code(404).send();if(config.METRICS_TOKEN&&request.headers.authorization!==`Bearer ${config.METRICS_TOKEN}`)return reply.code(401).send('unauthorized');return reply.type(registry.contentType).send(await registry.metrics());});
 app.get('/api/public-config',async()=>({botUsername:config.BOT_USERNAME||'',appVersion:config.APP_VERSION}));
 
-await apiRoutes(app);await v2Routes(app);await telegramWebhookRoutes(app);await adminRoutes(app);await adminV2Routes(app);
+await apiRoutes(app);await v2Routes(app);await v4Routes(app);await telegramWebhookRoutes(app);await adminRoutes(app);await adminV2Routes(app);await adminV4Routes(app);
 const realtime=redis?await createRealtimeServer(app.server,app.log):null;
 
 if(!redis){
@@ -106,8 +109,8 @@ app.get('/*',async(request,reply)=>{const raw=String((request.params as Record<s
 
 await configureTelegram().catch(error=>app.log.error({error},'Telegram configuration failed'));
 await app.listen({port:config.PORT,host:'0.0.0.0'});
-const stopBroadcastWorker=startBroadcastWorker(app.log);const stopBackupWorker=startBackupWorker(app.log);const voteTimer=setInterval(()=>void closeExpiredVotes().catch(error=>app.log.error({error},'Vote closer failed')),30_000);voteTimer.unref();
-let shuttingDown=false;async function shutdown(signal:string){if(shuttingDown)return;shuttingDown=true;app.log.info({signal},'Graceful shutdown');stopBroadcastWorker();stopBackupWorker();clearInterval(voteTimer);realtime?.stop();const force=setTimeout(()=>process.exit(1),12_000).unref();await app.close();await closeRedis();await pool.end();await flushSentry();clearTimeout(force);}
+const stopBroadcastWorker=startBroadcastWorker(app.log);const stopBackupWorker=startBackupWorker(app.log);const stopV4Worker=startV4Worker(app.log);const voteTimer=setInterval(()=>void closeExpiredVotes().catch(error=>app.log.error({error},'Vote closer failed')),30_000);voteTimer.unref();
+let shuttingDown=false;async function shutdown(signal:string){if(shuttingDown)return;shuttingDown=true;app.log.info({signal},'Graceful shutdown');stopBroadcastWorker();stopBackupWorker();stopV4Worker();clearInterval(voteTimer);realtime?.stop();const force=setTimeout(()=>process.exit(1),12_000).unref();await app.close();await closeRedis();await pool.end();await flushSentry();clearTimeout(force);}
 process.once('SIGTERM',()=>void shutdown('SIGTERM'));process.once('SIGINT',()=>void shutdown('SIGINT'));
 
 }

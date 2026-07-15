@@ -1,8 +1,10 @@
 import type { FastifyInstance } from 'fastify';
 import { config } from '../config.js';
-import { answerPreCheckout, fulfillSuccessfulPayment, sendWelcome } from '../telegram.js';
+import { answerPreCheckout, fulfillSuccessfulPayment, processRefundedPayment, sendWelcome } from '../telegram.js';
 import { upsertUser } from '../auth.js';
 import { pool } from '../db.js';
+import { attachSharedChat, paymentSupport } from '../services/v4.js';
+import { sendBotMessage } from '../telegram.js';
 
 export async function telegramWebhookRoutes(app: FastifyInstance): Promise<void> {
   app.post('/telegram/webhook', { config:{ rateLimit:false } }, async (request, reply) => {
@@ -17,6 +19,13 @@ export async function telegramWebhookRoutes(app: FastifyInstance): Promise<void>
     }
     const message=update.message;
     if(message?.successful_payment) await fulfillSuccessfulPayment(message);
+    if(message?.chat_shared&&message?.from?.id)await attachSharedChat(message.from.id,message.chat_shared);
+    if(message?.refunded_payment?.telegram_payment_charge_id)await processRefundedPayment(message.refunded_payment.telegram_payment_charge_id);
+    if(message?.text?.startsWith('/paysupport')) {
+      await upsertUser(message.from,null);
+      await paymentSupport(message.from.id,undefined,'Обращение создано через команду /paysupport');
+      await sendBotMessage(message.chat.id,'Обращение по оплате создано. Откройте игру → Ещё → Покупки, чтобы указать конкретный чек и описание проблемы.');
+    }
     if(message?.text?.startsWith('/start')) {
       const payload=message.text.split(/\s+/)[1] ?? null;
       await upsertUser(message.from,payload);
