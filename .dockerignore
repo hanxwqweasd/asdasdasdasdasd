@@ -3,3 +3,5 @@ dist
 .git
 .env
 README.md
+
+.audio-build

@@ -1,4 +1,4 @@
-# Railway migration hotfix 4.0.2
+# Railway migration hotfix 4.1.0
 
 This release fixes concurrent startup migrations on Railway.
 

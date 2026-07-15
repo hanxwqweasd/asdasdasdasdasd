@@ -1,4 +1,4 @@
-const APP_VERSION = "4.0.2";
+const APP_VERSION = "4.1.0";
 const tg = window.Telegram?.WebApp;
 
 if (tg) {
@@ -110,46 +110,158 @@ function telegramDiagnostics() {
   };
 }
 
+const SOUND_CUES = {
+  uiTap: { assets: ["ui-tap-01", "ui-tap-02", "ui-tap-03"], bus: "ui", volume: 0.34, cooldown: 26, polyphony: 5, rateJitter: 0.025 },
+  uiPrimary: { assets: ["ui-primary"], bus: "ui", volume: 0.54, cooldown: 70, polyphony: 2 },
+  uiTab: { assets: ["ui-tab"], bus: "ui", volume: 0.42, cooldown: 80, polyphony: 2, rateJitter: 0.018 },
+  uiBack: { assets: ["ui-back"], bus: "ui", volume: 0.44, cooldown: 80 },
+  uiOpen: { assets: ["ui-open"], bus: "ui", volume: 0.48, cooldown: 90 },
+  uiClose: { assets: ["ui-close"], bus: "ui", volume: 0.44, cooldown: 90 },
+  uiToggleOn: { assets: ["ui-toggle-on"], bus: "ui", volume: 0.48, cooldown: 70 },
+  uiToggleOff: { assets: ["ui-toggle-off"], bus: "ui", volume: 0.45, cooldown: 70 },
+  uiSlider: { assets: ["ui-slider"], bus: "ui", volume: 0.22, cooldown: 55, polyphony: 1, rateJitter: 0.05 },
+  uiSuccess: { assets: ["ui-success"], bus: "ui", volume: 0.58, cooldown: 260, duck: 0.06 },
+  uiError: { assets: ["ui-error"], bus: "ui", volume: 0.62, cooldown: 260, duck: 0.08 },
+  uiWarning: { assets: ["ui-warning"], bus: "ui", volume: 0.54, cooldown: 220 },
+  uiNotification: { assets: ["ui-notification"], bus: "ui", volume: 0.45, cooldown: 250 },
+  uiCard: { assets: ["ui-card"], bus: "ui", volume: 0.34, cooldown: 80 },
+  uiDisabled: { assets: ["ui-disabled"], bus: "ui", volume: 0.36, cooldown: 120 },
+
+  elevatorButton: { assets: ["elevator-button"], volume: 0.68, cooldown: 120, reverb: 0.08 },
+  elevatorTravel: { assets: ["elevator-travel"], volume: 0.82, cooldown: 700, polyphony: 1, duck: 0.22, reverb: 0.08 },
+  elevatorBrake: { assets: ["elevator-brake"], volume: 0.54, cooldown: 550, reverb: 0.18 },
+  floorTick: { assets: ["floor-tick-01", "floor-tick-02", "floor-tick-03"], volume: 0.43, cooldown: 100, polyphony: 2, rateJitter: 0.025, reverb: 0.08 },
+  elevatorArrive: { assets: ["elevator-arrive"], volume: 0.62, cooldown: 500, duck: 0.12, reverb: 0.18 },
+  elevatorBell: { assets: ["elevator-bell"], volume: 0.56, cooldown: 550, reverb: 0.28 },
+  doorOpen: { assets: ["door-open"], volume: 0.82, cooldown: 240, duck: 0.12, reverb: 0.3 },
+  doorClose: { assets: ["door-close"], volume: 0.78, cooldown: 240, duck: 0.1, reverb: 0.27 },
+  doorLock: { assets: ["door-lock"], volume: 0.6, cooldown: 150, reverb: 0.16 },
+  keyTurn: { assets: ["key-turn"], volume: 0.58, cooldown: 120, reverb: 0.12 },
+  roomShift: { assets: ["room-shift"], volume: 0.76, cooldown: 450, duck: 0.2, reverb: 0.3 },
+  dangerHit: { assets: ["danger-hit"], volume: 0.75, cooldown: 500, duck: 0.3, reverb: 0.35 },
+  camera: { assets: ["camera"], volume: 0.62, cooldown: 180, reverb: 0.12 },
+  paper: { assets: ["paper"], volume: 0.48, cooldown: 120, reverb: 0.07 },
+  pageTurn: { assets: ["page-turn"], volume: 0.42, cooldown: 100, reverb: 0.05 },
+  itemPickup: { assets: ["item-pickup"], volume: 0.5, cooldown: 120 },
+  itemPlace: { assets: ["item-place"], volume: 0.56, cooldown: 130, reverb: 0.09 },
+  inventoryOpen: { assets: ["inventory-open"], volume: 0.45, cooldown: 180 },
+  clueFound: { assets: ["clue-found"], volume: 0.68, cooldown: 400, duck: 0.08, reverb: 0.18 },
+  nerveDrop: { assets: ["nerve-drop"], volume: 0.58, cooldown: 380, reverb: 0.22 },
+  dangerRise: { assets: ["danger-rise"], volume: 0.54, cooldown: 360, reverb: 0.28 },
+  escape: { assets: ["escape"], volume: 0.72, cooldown: 900, duck: 0.2, reverb: 0.18 },
+  failure: { assets: ["failure"], volume: 0.8, cooldown: 900, duck: 0.34, reverb: 0.34 },
+  achievement: { assets: ["achievement"], volume: 0.66, cooldown: 650, duck: 0.12 },
+  collectionComplete: { assets: ["collection-complete"], volume: 0.7, cooldown: 650, duck: 0.12 },
+  purchaseStars: { assets: ["purchase-stars"], volume: 0.72, cooldown: 650, duck: 0.14 },
+  marks: { assets: ["marks"], volume: 0.5, cooldown: 180 },
+  vote: { assets: ["vote"], volume: 0.46, cooldown: 140 },
+  messageSend: { assets: ["message-send"], volume: 0.48, cooldown: 160 },
+  coopJoin: { assets: ["coop-join"], volume: 0.56, cooldown: 350 },
+  coopReady: { assets: ["coop-ready"], volume: 0.56, cooldown: 250 },
+  coopLeave: { assets: ["coop-leave"], volume: 0.52, cooldown: 350 },
+  reconnect: { assets: ["reconnect"], volume: 0.5, cooldown: 750 },
+  matchStart: { assets: ["match-start"], volume: 0.68, cooldown: 900, duck: 0.16, reverb: 0.2 },
+  matchEnd: { assets: ["match-end"], volume: 0.62, cooldown: 900, reverb: 0.16 },
+  spectatorCamera: { assets: ["spectator-camera"], volume: 0.52, cooldown: 200 },
+  spectatorLight: { assets: ["spectator-light"], volume: 0.58, cooldown: 250, reverb: 0.18 },
+  radioShort: { assets: ["radio-short"], volume: 0.55, cooldown: 90, reverb: 0.23 },
+  radioLong: { assets: ["radio-long"], volume: 0.6, cooldown: 180, reverb: 0.25 },
+  radioSuccess: { assets: ["radio-success"], volume: 0.68, cooldown: 600 },
+  radioFail: { assets: ["radio-fail"], volume: 0.6, cooldown: 600 },
+
+  houseFootstep: { assets: ["footsteps-01", "footsteps-02", "footsteps-03"], volume: 0.3, cooldown: 2600, polyphony: 1, panRange: 0.92, rateJitter: 0.035, reverb: 0.38 },
+  houseWhisper: { assets: ["whisper-01", "whisper-02", "whisper-03"], volume: 0.25, cooldown: 4200, polyphony: 1, panRange: 0.95, rateJitter: 0.02, reverb: 0.4 },
+  pipeKnock: { assets: ["pipe-knock"], volume: 0.3, cooldown: 2800, panRange: 0.9, reverb: 0.42 },
+  wallScratch: { assets: ["wall-scratch"], volume: 0.24, cooldown: 5000, panRange: 0.95, reverb: 0.42 },
+  bulbFlicker: { assets: ["bulb-flicker"], volume: 0.3, cooldown: 1800, panRange: 0.28, reverb: 0.16 },
+  waterDrip: { assets: ["water-drip"], volume: 0.25, cooldown: 2600, panRange: 0.9, reverb: 0.48 },
+  distantDoor: { assets: ["distant-door"], volume: 0.22, cooldown: 4200, panRange: 0.85, reverb: 0.44 },
+  distantElevator: { assets: ["distant-elevator"], volume: 0.2, cooldown: 6000, panRange: 0.65, reverb: 0.35 },
+  intercom: { assets: ["intercom"], volume: 0.3, cooldown: 3200, panRange: 0.55, reverb: 0.32 },
+};
+
+const LEGACY_SOUND_CUES = {
+  elevator: "elevatorTravel",
+  "elevator-bell": "elevatorBell",
+  door: "doorOpen",
+  room: "roomShift",
+  impact: "dangerHit",
+  purchase: "purchaseStars",
+  place: "itemPlace",
+  camera: "camera",
+  paper: "paper",
+};
+
 class HouseAudioEngine {
   constructor() {
     this.context = null;
     this.master = null;
     this.ambienceBus = null;
-    this.effectsBus = null;
+    this.worldBus = null;
+    this.uiBus = null;
     this.compressor = null;
+    this.reverb = null;
+    this.reverbReturn = null;
     this.buffers = new Map();
     this.loading = new Map();
     this.loops = new Map();
     this.unlocked = false;
     this.fallbackLoops = new Map();
+    this.cooldowns = new Map();
+    this.voices = new Map();
+    this.scene = null;
+    this.preloaded = false;
+    const probe = document.createElement("audio");
+    this.formats = probe.canPlayType?.('audio/mp4; codecs="mp4a.40.2"')
+      ? ["m4a", "ogg", "wav"]
+      : ["ogg", "m4a", "wav"];
   }
 
   async unlock() {
     if (this.unlocked && this.context?.state === "running") return true;
     try {
-      const AudioContextClass =
-        window.AudioContext || window.webkitAudioContext;
+      const AudioContextClass = window.AudioContext || window.webkitAudioContext;
       if (!AudioContextClass) return false;
       if (!this.context) {
-        this.context = new AudioContextClass({ latencyHint: "interactive" });
+        try {
+          this.context = new AudioContextClass({ latencyHint: "interactive", sampleRate: 48000 });
+        } catch {
+          this.context = new AudioContextClass({ latencyHint: "interactive" });
+        }
         this.master = this.context.createGain();
         this.ambienceBus = this.context.createGain();
-        this.effectsBus = this.context.createGain();
+        this.worldBus = this.context.createGain();
+        this.uiBus = this.context.createGain();
         this.compressor = this.context.createDynamicsCompressor();
-        this.compressor.threshold.value = -15;
+        this.compressor.threshold.value = -17;
         this.compressor.knee.value = 18;
-        this.compressor.ratio.value = 5;
-        this.compressor.attack.value = 0.008;
-        this.compressor.release.value = 0.22;
+        this.compressor.ratio.value = 4.5;
+        this.compressor.attack.value = 0.006;
+        this.compressor.release.value = 0.24;
+        this.reverb = this.context.createConvolver();
+        this.reverbReturn = this.context.createGain();
+        this.reverbReturn.gain.value = 0.18;
         this.ambienceBus.connect(this.master);
-        this.effectsBus.connect(this.compressor);
+        this.worldBus.connect(this.compressor);
+        this.uiBus.connect(this.compressor);
+        this.reverb.connect(this.reverbReturn);
+        this.reverbReturn.connect(this.compressor);
         this.compressor.connect(this.master);
         this.master.connect(this.context.destination);
+        void this.loadImpulse("corridor-ir");
       }
       await this.context.resume();
       this.unlocked = true;
       this.applyVolumes();
       document.body.classList.add("sound-active");
+      if (!this.preloaded) {
+        this.preloaded = true;
+        void this.preload([
+          "ui-tap-01", "ui-primary", "ui-tab", "ui-open", "ui-close",
+          "elevator-button", "elevator-travel", "floor-tick-01", "elevator-arrive",
+          "door-open", "room-shift", "camera", "paper", "item-place",
+        ]);
+      }
       return true;
     } catch (error) {
       console.warn("AudioContext unavailable", error);
@@ -157,89 +269,153 @@ class HouseAudioEngine {
     }
   }
 
-  applyVolumes() {
-    const now = this.context?.currentTime || 0;
-    const muted = state.audio.mute;
-    if (this.master) this.master.gain.setTargetAtTime(muted ? 0 : 1, now, 0.03);
-    if (this.ambienceBus)
-      this.ambienceBus.gain.setTargetAtTime(
-        state.audio.ambience / 100,
-        now,
-        0.06,
-      );
-    if (this.effectsBus)
-      this.effectsBus.gain.setTargetAtTime(
-        state.audio.effects / 100,
-        now,
-        0.03,
-      );
-    for (const audio of this.fallbackLoops.values()) {
-      audio.volume = muted
-        ? 0
-        : Math.min(
-            1,
-            (state.audio.ambience / 100) * Number(audio.dataset.volume || 1),
-          );
-    }
+  async preload(names) {
+    await Promise.allSettled(names.map((name) => this.load(name)));
   }
 
-  async load(name, kind = "effect") {
-    const key = `${kind}:${name}`;
-    if (this.buffers.has(key)) return this.buffers.get(key);
-    if (this.loading.has(key)) return this.loading.get(key);
-    const extension = kind === "ambience" ? "ogg" : "wav";
-    const task = fetch(`/audio/${name}.${extension}`, { cache: "force-cache" })
-      .then((response) => {
-        if (!response.ok) throw new Error(`Audio ${name} ${response.status}`);
-        return response.arrayBuffer();
-      })
-      .then((data) => this.context.decodeAudioData(data))
+  async fetchAudio(name) {
+    for (const extension of this.formats) {
+      try {
+        const response = await fetch(`/audio/${name}.${extension}`, { cache: "force-cache" });
+        if (!response.ok) continue;
+        return await response.arrayBuffer();
+      } catch {}
+    }
+    throw new Error(`Audio asset ${name} unavailable`);
+  }
+
+  async load(name) {
+    if (this.buffers.has(name)) return this.buffers.get(name);
+    if (this.loading.has(name)) return this.loading.get(name);
+    const task = this.fetchAudio(name)
+      .then((data) => this.context.decodeAudioData(data.slice(0)))
       .then((buffer) => {
-        this.buffers.set(key, buffer);
-        this.loading.delete(key);
+        this.buffers.set(name, buffer);
+        this.loading.delete(name);
         return buffer;
       })
       .catch((error) => {
-        this.loading.delete(key);
+        this.loading.delete(name);
         console.warn("Audio asset failed", name, error);
         return null;
       });
-    this.loading.set(key, task);
+    this.loading.set(name, task);
     return task;
   }
 
-  async play(name, { volume = 1, pan = 0, rate = 1, kind = "effect" } = {}) {
-    if (state.audio.mute) return;
+  async loadImpulse(name) {
+    if (!this.context || !this.reverb) return;
+    try {
+      const response = await fetch(`/audio/${name}.wav`, { cache: "force-cache" });
+      if (!response.ok) return;
+      this.reverb.buffer = await this.context.decodeAudioData(await response.arrayBuffer());
+    } catch (error) {
+      console.warn("Reverb impulse unavailable", error);
+    }
+  }
+
+  busFor(name) {
+    if (name === "ambience") return this.ambienceBus;
+    if (name === "ui") return this.uiBus;
+    return this.worldBus;
+  }
+
+  applyVolumes() {
+    const now = this.context?.currentTime || 0;
+    const muted = state.audio.mute;
+    const night = state.audio.night ? 0.72 : 1;
+    if (this.master) this.master.gain.setTargetAtTime(muted ? 0 : 1, now, 0.035);
+    if (this.ambienceBus) this.ambienceBus.gain.setTargetAtTime((state.audio.ambience / 100) * (state.audio.night ? 0.8 : 1), now, 0.08);
+    if (this.worldBus) this.worldBus.gain.setTargetAtTime((state.audio.effects / 100) * night, now, 0.04);
+    if (this.uiBus) this.uiBus.gain.setTargetAtTime((state.audio.interface / 100) * (state.audio.night ? 0.82 : 1), now, 0.035);
+    if (this.reverbReturn) this.reverbReturn.gain.setTargetAtTime(state.audio.spatial ? 0.18 : 0.04, now, 0.12);
+    for (const audio of this.fallbackLoops.values()) {
+      audio.volume = muted ? 0 : Math.min(1, (state.audio.ambience / 100) * Number(audio.dataset.volume || 1));
+    }
+  }
+
+  duckAmbience(amount = 0.15, duration = 0.6) {
+    if (!this.context || !this.ambienceBus || amount <= 0) return;
+    const now = this.context.currentTime;
+    const base = (state.audio.ambience / 100) * (state.audio.night ? 0.8 : 1);
+    this.ambienceBus.gain.cancelScheduledValues(now);
+    this.ambienceBus.gain.setTargetAtTime(base * (1 - amount), now, 0.025);
+    this.ambienceBus.gain.setTargetAtTime(base, now + duration, 0.18);
+  }
+
+  async cue(name, overrides = {}) {
+    if (state.audio.mute) return null;
+    const cue = SOUND_CUES[name] || { assets: [name], volume: 1, bus: "world" };
+    const nowMs = performance.now();
+    const last = this.cooldowns.get(name) || 0;
+    const cooldown = overrides.cooldown ?? cue.cooldown ?? 0;
+    if (nowMs - last < cooldown) return null;
+    const group = cue.group || name;
+    const count = this.voices.get(group) || 0;
+    if (count >= (cue.polyphony || 3)) return null;
+    this.cooldowns.set(name, nowMs);
+    this.voices.set(group, count + 1);
+    const assets = cue.assets || [name];
+    const asset = assets[Math.floor(Math.random() * assets.length)];
+    const rateJitter = cue.rateJitter || 0;
+    const rate = (overrides.rate || 1) * (1 + (Math.random() * 2 - 1) * rateJitter);
+    const panRange = cue.panRange || 0;
+    const requestedPan = overrides.pan ?? (panRange ? (Math.random() * 2 - 1) * panRange : 0);
+    const pan = state.audio.spatial ? requestedPan : 0;
+    if (cue.duck || overrides.duck) this.duckAmbience(overrides.duck ?? cue.duck, overrides.duckDuration || 0.62);
+    try {
+      return await this.playAsset(asset, {
+        volume: (cue.volume ?? 1) * (overrides.volume ?? 1),
+        pan,
+        rate,
+        bus: overrides.bus || cue.bus || "world",
+        reverb: overrides.reverb ?? cue.reverb ?? 0,
+        onEnded: () => this.voices.set(group, Math.max(0, (this.voices.get(group) || 1) - 1)),
+      });
+    } catch (error) {
+      this.voices.set(group, Math.max(0, (this.voices.get(group) || 1) - 1));
+      return null;
+    }
+  }
+
+  async playAsset(name, { volume = 1, pan = 0, rate = 1, bus = "world", reverb = 0, onEnded } = {}) {
     const ready = await this.unlock();
-    if (!ready || !this.context)
-      return this.playFallback(name, { volume, kind });
-    const buffer = await this.load(name, kind);
-    if (!buffer) return this.playFallback(name, { volume, kind });
+    if (!ready || !this.context) return this.playFallback(name, { volume, bus, onEnded });
+    const buffer = await this.load(name);
+    if (!buffer) return this.playFallback(name, { volume, bus, onEnded });
     const source = this.context.createBufferSource();
     const gain = this.context.createGain();
     const panner = this.context.createStereoPanner?.();
     source.buffer = buffer;
-    source.playbackRate.value = rate;
-    gain.gain.value = Math.max(0, Math.min(1.4, volume));
+    source.playbackRate.value = Math.max(0.72, Math.min(1.35, rate));
+    gain.gain.value = Math.max(0, Math.min(1.3, volume));
     source.connect(gain);
+    let output = gain;
     if (panner) {
       panner.pan.value = Math.max(-1, Math.min(1, pan));
       gain.connect(panner);
-      panner.connect(kind === "ambience" ? this.ambienceBus : this.effectsBus);
-    } else {
-      gain.connect(kind === "ambience" ? this.ambienceBus : this.effectsBus);
+      output = panner;
     }
+    output.connect(this.busFor(bus));
+    if (reverb > 0 && this.reverb?.buffer) {
+      const send = this.context.createGain();
+      send.gain.value = Math.min(0.7, reverb);
+      output.connect(send);
+      send.connect(this.reverb);
+    }
+    source.onended = () => onEnded?.();
     source.start();
     return source;
   }
 
-  playFallback(name, { volume = 1, kind = "effect" } = {}) {
-    const extension = kind === "ambience" ? "ogg" : "wav";
-    const audio = new Audio(`/audio/${name}.${extension}`);
-    const bus =
-      kind === "ambience" ? state.audio.ambience : state.audio.effects;
-    audio.volume = state.audio.mute ? 0 : Math.min(1, (bus / 100) * volume);
-    audio.play().catch(() => {});
+  playFallback(name, { volume = 1, bus = "world", onEnded } = {}) {
+    const audio = new Audio(`/audio/${name}.m4a`);
+    const level = bus === "ambience" ? state.audio.ambience : bus === "ui" ? state.audio.interface : state.audio.effects;
+    audio.volume = state.audio.mute ? 0 : Math.min(1, (level / 100) * volume * (state.audio.night && bus !== "ambience" ? 0.75 : 1));
+    const finish = () => onEnded?.();
+    audio.addEventListener("ended", finish, { once: true });
+    audio.addEventListener("error", finish, { once: true });
+    audio.play().catch(() => finish());
     return audio;
   }
 
@@ -248,7 +424,7 @@ class HouseAudioEngine {
     const ready = await this.unlock();
     if (!ready || !this.context) {
       if (!this.fallbackLoops.has(name)) {
-        const audio = new Audio(`/audio/${name}.ogg`);
+        const audio = new Audio(`/audio/${name}.m4a`);
         audio.loop = true;
         audio.dataset.volume = String(volume);
         this.fallbackLoops.set(name, audio);
@@ -260,10 +436,10 @@ class HouseAudioEngine {
     if (this.loops.has(name)) {
       const entry = this.loops.get(name);
       entry.targetVolume = volume;
-      entry.gain.gain.setTargetAtTime(volume, this.context.currentTime, 0.6);
+      entry.gain.gain.setTargetAtTime(volume, this.context.currentTime, 0.75);
       return;
     }
-    const buffer = await this.load(name, "ambience");
+    const buffer = await this.load(name);
     if (!buffer || this.loops.has(name)) return;
     const source = this.context.createBufferSource();
     const gain = this.context.createGain();
@@ -272,22 +448,19 @@ class HouseAudioEngine {
     gain.gain.value = 0;
     source.connect(gain);
     gain.connect(this.ambienceBus);
-    source.start();
-    gain.gain.setTargetAtTime(volume, this.context.currentTime, 0.7);
+    source.start(0, Math.random() * Math.max(0.1, buffer.duration - 0.1));
+    gain.gain.setTargetAtTime(volume, this.context.currentTime, 0.9);
     this.loops.set(name, { source, gain, targetVolume: volume });
   }
 
   fadeLoop(name, stop = true) {
     const entry = this.loops.get(name);
     if (entry && this.context) {
-      entry.gain.gain.setTargetAtTime(0, this.context.currentTime, 0.45);
-      if (stop)
-        setTimeout(() => {
-          try {
-            entry.source.stop();
-          } catch {}
-          this.loops.delete(name);
-        }, 1300);
+      entry.gain.gain.setTargetAtTime(0, this.context.currentTime, 0.5);
+      if (stop) setTimeout(() => {
+        try { entry.source.stop(); } catch {}
+        this.loops.delete(name);
+      }, 1600);
     }
     const fallback = this.fallbackLoops.get(name);
     if (fallback) {
@@ -299,47 +472,51 @@ class HouseAudioEngine {
 
   setScene(tab) {
     const scenes = {
-      home: { "rain-window": 0.5, "lamp-hum": 0.21 },
-      coop: { "rain-window": 0.25, "floor-ambience": 0.46 },
-      building: { "rain-window": 0.34, neighbor: 0.13 },
-      archive: { "lamp-hum": 0.2, television: 0.09 },
-      market: { "rain-window": 0.25, "floor-ambience": 0.13 },
-      more: { "rain-window": 0.31, wind: 0.1 },
+      home: { "apartment-night": 0.44, "rain-window": 0.2, "lamp-hum": 0.1 },
+      coop: { "coop-tension": 0.46, "eighth-floor": 0.2 },
+      building: { "building-hall": 0.5, neighbor: 0.08 },
+      archive: { "archive-room": 0.48, "lamp-hum": 0.08 },
+      market: { "market-lobby": 0.44, "building-hall": 0.1 },
+      more: { "apartment-night": 0.24, wind: 0.07 },
     };
     const desired = scenes[tab] || scenes.home;
-    for (const name of new Set([
-      ...this.loops.keys(),
-      ...this.fallbackLoops.keys(),
-    ])) {
-      if (!(name in desired)) this.fadeLoop(name);
+    this.scene = tab;
+    if (!["home", "coop"].includes(tab)) this.setTension(0);
+    for (const name of new Set([...this.loops.keys(), ...this.fallbackLoops.keys()])) {
+      if (!(name in desired) && !name.startsWith("tension-")) this.fadeLoop(name);
     }
-    for (const [name, volume] of Object.entries(desired))
-      void this.ensureLoop(name, volume);
+    for (const [name, volume] of Object.entries(desired)) void this.ensureLoop(name, volume);
+  }
+
+  setTension(level = 0) {
+    if (level >= 65) {
+      this.fadeLoop("tension-low");
+      void this.ensureLoop("tension-high", 0.27);
+    } else if (level >= 32) {
+      this.fadeLoop("tension-high");
+      void this.ensureLoop("tension-low", 0.2);
+    } else {
+      this.fadeLoop("tension-low");
+      this.fadeLoop("tension-high");
+    }
   }
 
   stopAll() {
-    for (const name of [...this.loops.keys(), ...this.fallbackLoops.keys()])
-      this.fadeLoop(name);
+    for (const name of [...this.loops.keys(), ...this.fallbackLoops.keys()]) this.fadeLoop(name);
   }
 
   async testSpace() {
     await this.unlock();
-    await this.play("elevator-bell", {
-      kind: "ambience",
-      volume: 0.45,
-      pan: -0.85,
-    });
-    await wait(480);
-    await this.play("footsteps", {
-      kind: "ambience",
-      volume: 0.34,
-      pan: 0.82,
-      rate: 1.08,
-    });
+    await this.cue("pipeKnock", { pan: -0.88, volume: 1.05 });
+    await wait(680);
+    await this.cue("houseFootstep", { pan: 0.84, volume: 1.08 });
+    await wait(920);
+    await this.cue("houseWhisper", { pan: -0.72, volume: 0.9 });
   }
 }
 
 const audioEngine = new HouseAudioEngine();
+
 
 const state = {
   base: null,
@@ -359,9 +536,13 @@ const state = {
   assignments: {},
   audio: {
     ambience: Number(localStorage.getItem("ef_ambience") ?? 58),
-    effects: Number(localStorage.getItem("ef_effects") ?? 74),
+    effects: Number(localStorage.getItem("ef_effects") ?? 76),
+    interface: Number(localStorage.getItem("ef_interface") ?? 48),
     mute: localStorage.getItem("ef_mute") === "1",
     vibration: localStorage.getItem("ef_vibration") !== "0",
+    spatial: localStorage.getItem("ef_spatial") !== "0",
+    rare: localStorage.getItem("ef_rare") !== "0",
+    night: localStorage.getItem("ef_night") === "1",
   },
   motionReduced: reduceMotion,
   ambientTimer: null,
@@ -402,8 +583,11 @@ function finishBoot(message = "Двери открываются") {
 }
 
 function setNetworkState(online) {
+  const wasOffline = document.body.classList.contains("network-offline");
   document.body.classList.toggle("network-offline", !online);
   networkBanner?.classList.toggle("hidden", online);
+  if (!online && !wasOffline) void audioEngine.cue("uiWarning");
+  if (online && wasOffline) void audioEngine.cue("reconnect", { volume: 0.72 });
   if (online && state.base) void bootstrap({ preserveTab: true, quiet: true });
 }
 window.addEventListener("online", () => setNetworkState(true));
@@ -463,12 +647,15 @@ async function api(path, options = {}) {
   throw lastError;
 }
 
-function toast(text, tone = "neutral") {
+function toast(text, tone = "neutral", withSound = true) {
   toastEl.textContent = text;
   toastEl.dataset.tone = tone;
   toastEl.classList.add("show");
   clearTimeout(toastEl._t);
   toastEl._t = setTimeout(() => toastEl.classList.remove("show"), 3000);
+  if (withSound && tone === "success") void audioEngine.cue("uiSuccess");
+  if (withSound && tone === "warning") void audioEngine.cue("uiWarning");
+  if (withSound && tone === "error") void audioEngine.cue("uiError");
 }
 function haptic(type = "light") {
   if (!state.audio.vibration) return;
@@ -477,10 +664,17 @@ function haptic(type = "light") {
   else tg?.HapticFeedback?.impactOccurred?.(type);
 }
 function effect(name, volume = 1, pan = 0) {
-  return audioEngine.play(name, { volume, pan, kind: "effect" });
+  return audioEngine.cue(LEGACY_SOUND_CUES[name] || name, { volume, pan });
 }
 function ambient(name, volume = 1, pan = Math.random() * 1.6 - 0.8) {
-  return audioEngine.play(name, { volume, pan, kind: "ambience" });
+  const mapped = {
+    footsteps: "houseFootstep", whisper: "houseWhisper", pipes: "pipeKnock",
+    intercom: "intercom", "elevator-bell": "elevatorBell", camera: "camera",
+    neighbor: "distantDoor", television: "distantElevator", wind: "wallScratch",
+  }[name];
+  return mapped
+    ? audioEngine.cue(mapped, { volume, pan })
+    : audioEngine.playAsset(name, { volume, pan, bus: "world", reverb: 0.22 });
 }
 function loop(name, volume = 1) {
   return audioEngine.ensureLoop(name, volume);
@@ -490,26 +684,23 @@ function stopLoops() {
 }
 function scheduleAmbient() {
   clearTimeout(state.ambientTimer);
-  if (state.audio.mute || state.audio.ambience === 0 || document.hidden) return;
+  if (state.audio.mute || state.audio.ambience === 0 || document.hidden || !state.audio.rare) return;
   const pools = {
-    home: ["pipes", "neighbor", "television", "wind", "elevator-bell"],
-    coop: ["footsteps", "whisper", "pipes", "intercom"],
-    building: ["neighbor", "television", "intercom", "pipes"],
-    archive: ["camera", "wind", "television"],
-    market: ["footsteps", "neighbor", "elevator-bell"],
-    more: ["pipes", "wind", "intercom"],
+    home: ["pipeKnock", "distantDoor", "waterDrip", "bulbFlicker", "distantElevator"],
+    coop: ["houseFootstep", "houseWhisper", "pipeKnock", "intercom", "wallScratch"],
+    building: ["distantDoor", "houseFootstep", "intercom", "pipeKnock"],
+    archive: ["pageTurn", "wallScratch", "bulbFlicker", "houseWhisper"],
+    market: ["houseFootstep", "distantDoor", "elevatorBell"],
+    more: ["pipeKnock", "waterDrip", "intercom", "wallScratch"],
   };
   const sounds = pools[state.tab] || pools.home;
-  state.ambientTimer = setTimeout(
-    () => {
-      void ambient(
-        sounds[Math.floor(Math.random() * sounds.length)],
-        0.12 + Math.random() * 0.2,
-      );
-      scheduleAmbient();
-    },
-    10000 + Math.random() * 22000,
-  );
+  state.ambientTimer = setTimeout(() => {
+    void audioEngine.cue(sounds[Math.floor(Math.random() * sounds.length)], {
+      volume: 0.72 + Math.random() * 0.34,
+      pan: Math.random() * 1.8 - 0.9,
+    });
+    scheduleAmbient();
+  }, 8500 + Math.random() * 19000);
 }
 function startHouseAudio() {
   if (state.audio.mute) return;
@@ -535,9 +726,12 @@ async function playFloorTransition({
   open = true,
 } = {}) {
   const overlay = $("#floorTransition");
+  const target = Number(floor) || 8;
+  void audioEngine.cue("elevatorButton");
   if (!overlay || state.motionReduced) {
-    state.lastFloor = Number(floor) || state.lastFloor;
-    await effect("elevator", 0.72);
+    state.lastFloor = target;
+    await audioEngine.cue("elevatorTravel", { rate: 1.15, volume: 0.74 });
+    if (open) void audioEngine.cue("elevatorArrive");
     return;
   }
   const floorEl = $("#transitionFloor");
@@ -545,25 +739,35 @@ async function playFloorTransition({
   overlay.classList.remove("hidden", "open", "leaving");
   overlay.setAttribute("aria-hidden", "false");
   labelEl.textContent = label;
-  const target = Number(floor) || 8;
-  const sequence = [state.lastFloor || 7, 6, 7, 9, target];
-  void effect("elevator", 0.84);
+  const current = state.lastFloor || 7;
+  const sequence = target === 1 ? [current, 7, 5, 3, 1] : [current, 6, 7, 9, target];
+  void audioEngine.cue("elevatorTravel", { rate: 1.12, volume: 0.92 });
   haptic("medium");
-  for (const value of sequence) {
-    floorEl.textContent = String(value);
-    await wait(150);
+  await wait(230);
+  for (let index = 0; index < sequence.length; index += 1) {
+    floorEl.textContent = String(sequence[index]);
+    floorEl.classList.remove("floor-pulse");
+    void floorEl.offsetWidth;
+    floorEl.classList.add("floor-pulse");
+    void audioEngine.cue("floorTick", { pan: (index - 2) * 0.08 });
+    haptic("light");
+    await wait(state.motionReduced ? 90 : 360 + index * 22);
   }
   floorEl.textContent = String(target);
   state.lastFloor = target;
-  await wait(280);
+  void audioEngine.cue("elevatorBrake");
+  await wait(520);
   if (open) {
+    void audioEngine.cue("elevatorArrive");
+    await wait(180);
     overlay.classList.add("open");
-    void ambient("elevator-bell", 0.4, 0);
+    void audioEngine.cue("elevatorBell", { volume: 0.92 });
+    void audioEngine.cue("doorOpen", { volume: 0.72 });
     haptic("success");
-    await wait(760);
+    await wait(980);
   }
   overlay.classList.add("leaving");
-  await wait(330);
+  await wait(380);
   overlay.classList.add("hidden");
   overlay.classList.remove("open", "leaving");
   overlay.setAttribute("aria-hidden", "true");
@@ -605,8 +809,11 @@ function updateTelegramNavigation() {
 
 function handleTelegramBack() {
   if ($("#sheet")?.open) return closeSheet();
-  if (!$("#soundPanel")?.classList.contains("hidden"))
-    return $("#soundPanel").classList.add("hidden");
+  if (!$("#soundPanel")?.classList.contains("hidden")) {
+    $("#soundPanel").classList.add("hidden");
+    void audioEngine.cue("uiClose");
+    return;
+  }
   if (state.tab !== "home") return setTab("home");
 }
 tg?.BackButton?.onClick?.(handleTelegramBack);
@@ -648,9 +855,9 @@ async function bootstrap({ preserveTab = true, quiet = false } = {}) {
     if (!quiet) {
       track("app_open", { tab: state.tab, platform: tg?.platform || "web" });
       setTimeout(() => {
-        void audioEngine.load("door", "effect");
-        void audioEngine.load("room", "effect");
-        void audioEngine.load("rain-window", "ambience");
+        void audioEngine.load("door-open");
+        void audioEngine.load("room-shift");
+        void audioEngine.load("apartment-night");
       }, 300);
     }
   } catch (error) {
@@ -725,6 +932,7 @@ function renderDailyRibbon() {
 }
 async function setTab(tab) {
   if (!tab || tab === state.tab) return;
+  void audioEngine.cue("uiTab");
   state.previousTab = state.tab;
   state.tab = tab;
   $$("#bottomNav button").forEach((button) =>
@@ -883,8 +1091,8 @@ function renderSoloExpedition() {
     (button) =>
       (button.onclick = () => chooseSolo(Number(button.dataset.soloChoice))),
   );
-  void loop("floor-ambience", 0.39);
-  if (state.expedition.state.danger > 40) void loop("whisper", 0.16);
+  void loop("eighth-floor", 0.42);
+  audioEngine.setTension(state.expedition.state.danger);
   updateTelegramNavigation();
 }
 
@@ -976,17 +1184,21 @@ async function startExpedition() {
 }
 async function chooseSolo(choiceIndex) {
   try {
-    $$("[data-solo-choice]").forEach((button) => (button.disabled = true));
-    const door = $(".hall-door");
-    door?.classList.add("door-opening");
-    void effect("door", 0.88, Math.random() * 0.4 - 0.2);
-    haptic("medium");
+    $$('[data-solo-choice]').forEach((button) => (button.disabled = true));
+    const previousState = { ...state.expedition.state };
+    const door = $('.hall-door');
+    door?.classList.add('door-opening');
+    void audioEngine.cue('doorOpen', { pan: Math.random() * 0.34 - 0.17 });
+    haptic('medium');
     const result = await api(`/api/expeditions/${state.expedition.id}/action`, {
-      method: "POST",
+      method: 'POST',
       body: JSON.stringify({ choiceIndex, operationId: opId() }),
     });
-    toast(result.outcome);
-    track("room_choice", {
+    toast(result.outcome, 'neutral', false);
+    if (Number(result.state?.clues) > Number(previousState.clues)) void audioEngine.cue('clueFound');
+    if (Number(result.state?.danger) > Number(previousState.danger) + 3) void audioEngine.cue('dangerRise');
+    if (Number(result.state?.nerve) < Number(previousState.nerve) - 3) void audioEngine.cue('nerveDrop');
+    track('room_choice', {
       roomId: state.expedition.room?.id,
       choiceIndex,
       status: result.status,
@@ -994,30 +1206,29 @@ async function chooseSolo(choiceIndex) {
     });
     state.expedition = { ...state.expedition, ...result };
     state.listenHint = null;
-    if (result.status === "active") {
-      await playFloorTransition({
-        floor: result.roomIndex + 8,
-        label: "Планировка меняется",
-      });
-      void effect("room", 0.72);
+    if (result.status === 'active') {
+      void audioEngine.cue('doorClose', { volume: 0.62 });
+      await playFloorTransition({ floor: result.roomIndex + 8, label: 'Планировка меняется' });
+      void audioEngine.cue('roomShift');
       renderHome();
     } else {
-      void effect(result.status === "escaped" ? "elevator" : "impact", 0.9);
-      haptic(result.status === "escaped" ? "success" : "error");
-      view.innerHTML = `<div class="card" style="text-align:center;padding:30px"><div class="app-badge">${icon(result.status === "escaped" ? "check" : "warning")} ВЫЛАЗКА ЗАВЕРШЕНА</div><h2 style="font-family:PT Serif">${result.status === "escaped" ? "Лифт вернул вас домой" : "Коридор закрылся раньше"}</h2><p>Улики: ${result.state.clues} · опасность: ${result.state.danger}</p><div class="floor-map">${Array.from({ length: result.state.maxRooms }, () => '<i class="passed"></i>').join("")}</div><button class="primary full" id="soloReturn">${icon("home", "button-icon")}Вернуться в квартиру</button></div>`;
-      $("#soloReturn").onclick = async () => {
-        if (result.status === "escaped")
-          await playFloorTransition({ floor: 1, label: "Возвращение домой" });
+      void audioEngine.cue(result.status === 'escaped' ? 'escape' : 'failure');
+      haptic(result.status === 'escaped' ? 'success' : 'error');
+      view.innerHTML = `<div class="card" style="text-align:center;padding:30px"><div class="app-badge">${icon(result.status === 'escaped' ? 'check' : 'warning')} ВЫЛАЗКА ЗАВЕРШЕНА</div><h2 style="font-family:PT Serif">${result.status === 'escaped' ? 'Лифт вернул вас домой' : 'Коридор закрылся раньше'}</h2><p>Улики: ${result.state.clues} · опасность: ${result.state.danger}</p><div class="floor-map">${Array.from({ length: result.state.maxRooms }, () => '<i class="passed"></i>').join('')}</div><button class="primary full" id="soloReturn">${icon('home', 'button-icon')}Вернуться в квартиру</button></div>`;
+      $('#soloReturn').onclick = async () => {
+        if (result.status === 'escaped') await playFloorTransition({ floor: 1, label: 'Возвращение домой' });
         state.expedition = null;
+        audioEngine.setTension(0);
         await bootstrap({ quiet: true });
       };
     }
   } catch (error) {
-    toast(error.message, "error");
-    haptic("error");
+    toast(error.message, 'error');
+    haptic('error');
     renderHome();
   }
 }
+
 function socketEmit(event, payload = {}) {
   return new Promise((resolve, reject) => {
     if (!state.socket?.connected)
@@ -1046,16 +1257,24 @@ function connectCoop(active = null) {
       reconnectionDelayMax: 4000,
       randomizationFactor: 0.35,
     });
+    let connectedBefore = false;
     state.socket.on("connect", () => {
       $("#coopDot")?.classList.remove("hidden");
-      if (active?.id)
-        socketEmit("coop:resume", { matchId: active.id }).catch(() => {});
+      if (connectedBefore) void audioEngine.cue("reconnect");
+      connectedBefore = true;
+      if (active?.id) socketEmit("coop:resume", { matchId: active.id }).catch(() => {});
     });
-    state.socket.on("disconnect", () => $("#coopDot")?.classList.add("hidden"));
+    state.socket.on("disconnect", () => {
+      $("#coopDot")?.classList.add("hidden");
+      void audioEngine.cue("uiWarning", { volume: 0.55 });
+    });
     state.socket.on("coop:state", async (data) => {
       const previousRoom = state.coop?.roomIndex;
       const previousPhase = state.coop?.phase;
       state.coop = data;
+      if (previousPhase !== "playing" && data.phase === "playing") void audioEngine.cue("matchStart");
+      if (previousPhase === "playing" && ["escaped", "lost", "cancelled"].includes(data.phase))
+        void audioEngine.cue(data.phase === "escaped" ? "escape" : "matchEnd");
       if (
         data.phase === "playing" &&
         (previousPhase !== "playing" ||
@@ -1070,7 +1289,8 @@ function connectCoop(active = null) {
     });
     state.socket.on("coop:matched", async (data) => {
       state.coop = data;
-      toast("Лифт нашёл попутчиков", "success");
+      void audioEngine.cue("coopJoin");
+      toast("Лифт нашёл попутчиков", "success", false);
       await setTab("coop");
     });
     state.socket.on("connect_error", (error) => {
@@ -1116,7 +1336,8 @@ function renderCoop() {
     startCoopTimer();
     bindCoopScene(coop, room);
   }
-  void loop("floor-ambience", 0.5);
+  void loop("coop-tension", 0.48);
+  audioEngine.setTension(coop.shared?.danger || 0);
 }
 
 function bindCoopScene(coop, room) {
@@ -1191,52 +1412,39 @@ function bindCoop(c) {
 async function coopCommand(command, c = state.coop) {
   try {
     connectCoop();
-    if (command === "create")
-      state.coop = await socketEmit("coop:create", { maxPlayers: 4 });
+    if (command === "create") { state.coop = await socketEmit("coop:create", { maxPlayers: 4 }); void audioEngine.cue("coopJoin"); }
     if (command === "matchmake") {
       const r = await socketEmit("coop:matchmake", {});
-      if (r.queued)
-        toast(
-          `Вы в очереди${r.position != null ? " · позиция " + (r.position + 1) : ""}`,
-        );
-      else state.coop = r.state;
+      if (r.queued) toast(`Вы в очереди${r.position != null ? " · позиция " + (r.position + 1) : ""}`);
+      else { state.coop = r.state; void audioEngine.cue("coopJoin"); }
     }
-    if (command === "join")
-      state.coop = await socketEmit("coop:join", {
-        code: $("#coopCode")?.value?.trim().toUpperCase(),
-      });
-    if (command === "spectate")
-      state.coop = await socketEmit("coop:spectate", {code: $("#coopCode")?.value?.trim().toUpperCase()});
-    if (command === "ready")
+    if (command === "join") { state.coop = await socketEmit("coop:join", { code: $("#coopCode")?.value?.trim().toUpperCase() }); void audioEngine.cue("coopJoin"); }
+    if (command === "spectate") { state.coop = await socketEmit("coop:spectate", { code: $("#coopCode")?.value?.trim().toUpperCase() }); void audioEngine.cue("spectatorCamera"); }
+    if (command === "ready") {
       state.coop = await socketEmit("coop:ready", {
         matchId: c.id,
-        ready: !c.players.find(
-          (p) => String(p.userId) === String(state.base.profile.user_id),
-        )?.ready,
+        ready: !c.players.find((p) => String(p.userId) === String(state.base.profile.user_id))?.ready,
       });
-    if (command === "start")
-      state.coop = await socketEmit("coop:start", { matchId: c.id });
-    if (command === "leave") {
-      await socketEmit("coop:leave", { matchId: c.id });
-      state.coop = null;
+      void audioEngine.cue("coopReady");
     }
-    if (command === "reset") {
-      state.coop = null;
-      state.v2.activeCoop = null;
-    }
+    if (command === "start") { state.coop = await socketEmit("coop:start", { matchId: c.id }); void audioEngine.cue("matchStart"); }
+    if (command === "leave") { await socketEmit("coop:leave", { matchId: c.id }); state.coop = null; void audioEngine.cue("coopLeave"); }
+    if (command === "reset") { state.coop = null; state.v2.activeCoop = null; void audioEngine.cue("uiBack"); }
     haptic("medium");
     renderCoop();
   } catch (e) {
-    toast(e.message);
+    toast(e.message, "error");
   }
 }
+
 async function spectatorAction(action,matchId){
-  try{state.coop=await socketEmit('coop:spectator-action',{matchId,action});effect(action==='light'?'elevator-bell':'camera',.6);haptic('medium');renderCoop();}catch(e){toast(e.message,'error');}
+  try{state.coop=await socketEmit('coop:spectator-action',{matchId,action});void audioEngine.cue(action==='light'?'spectatorLight':'spectatorCamera');haptic('medium');renderCoop();}catch(e){toast(e.message,'error');}
 }
 async function coopAction(action, matchId) {
   try {
     state.coop = await socketEmit("coop:action", { matchId, action });
-    effect(action === "light" ? "elevator-bell" : "room");
+    const sounds = { light: "spectatorLight", inspect: "camera", help: "coopReady", mark: "messageSend" };
+    void audioEngine.cue(sounds[action] || "roomShift", { volume: 0.82 });
     haptic();
     renderCoop();
   } catch (e) {
@@ -1246,7 +1454,7 @@ async function coopAction(action, matchId) {
 async function coopVote(choiceIndex, matchId) {
   try {
     state.coop = await socketEmit("coop:vote", { matchId, choiceIndex });
-    effect("paper", 0.5);
+    void audioEngine.cue("vote");
     renderCoop();
   } catch (e) {
     toast(e.message);
@@ -1922,7 +2130,11 @@ function renderSettings() {
   <div class="card form-stack">
     <div class="headphone-callout">${icon("headphones")}<div><b>Пространственный звук</b><p>Шаги, лифт и голоса получают направление. Для полной сцены используйте наушники.</p></div></div>
     <label>Окружение <output>${state.audio.ambience}</output><input data-audio="ambience" type="range" min="0" max="100" value="${state.audio.ambience}"></label>
-    <label>События <output>${state.audio.effects}</output><input data-audio="effects" type="range" min="0" max="100" value="${state.audio.effects}"></label>
+    <label>Игровые действия <output>${state.audio.effects}</output><input data-audio="effects" type="range" min="0" max="100" value="${state.audio.effects}"></label>
+    <label>Интерфейс <output>${state.audio.interface}</output><input data-audio="interface" type="range" min="0" max="100" value="${state.audio.interface}"></label>
+    <label class="switch-row"><span>Пространственный звук</span><input data-audio="spatial" type="checkbox" ${state.audio.spatial ? "checked" : ""}></label>
+    <label class="switch-row"><span>Редкие звуки дома</span><input data-audio="rare" type="checkbox" ${state.audio.rare ? "checked" : ""}></label>
+    <label class="switch-row"><span>Ночной режим громкости</span><input data-audio="night" type="checkbox" ${state.audio.night ? "checked" : ""}></label>
     <label class="switch-row"><span>Вибрация</span><input data-audio="vibration" type="checkbox" ${state.audio.vibration ? "checked" : ""}></label>
     <label class="switch-row"><span>Полная тишина</span><input data-audio="mute" type="checkbox" ${state.audio.mute ? "checked" : ""}></label>
     <label class="switch-row"><span>Уменьшить анимации</span><input data-motion type="checkbox" ${state.motionReduced ? "checked" : ""}></label>
@@ -1956,7 +2168,9 @@ function updateAudio(key, value) {
   state.audio[key] = value;
   localStorage.setItem(
     `ef_${key}`,
-    key === "mute" || key === "vibration" ? (value ? "1" : "0") : String(value),
+    ["mute", "vibration", "spatial", "rare", "night"].includes(key)
+      ? (value ? "1" : "0")
+      : String(value),
   );
   audioEngine.applyVolumes();
   if (key === "mute" && value) audioEngine.stopAll();
@@ -1970,29 +2184,7 @@ function updateAudio(key, value) {
 }
 
 async function playKnock(long = false, pan = 0) {
-  const ready = await audioEngine.unlock();
-  if (!ready || !audioEngine.context)
-    return effect("impact", long ? 0.16 : 0.1, pan);
-  const context = audioEngine.context;
-  const oscillator = context.createOscillator();
-  const gain = context.createGain();
-  const panner = context.createStereoPanner?.();
-  const now = context.currentTime;
-  const duration = long ? 0.31 : 0.105;
-  oscillator.type = "triangle";
-  oscillator.frequency.setValueAtTime(long ? 78 : 112, now);
-  oscillator.frequency.exponentialRampToValueAtTime(48, now + duration);
-  gain.gain.setValueAtTime(0.0001, now);
-  gain.gain.exponentialRampToValueAtTime(long ? 0.34 : 0.23, now + 0.008);
-  gain.gain.exponentialRampToValueAtTime(0.0001, now + duration);
-  oscillator.connect(gain);
-  if (panner) {
-    panner.pan.value = pan;
-    gain.connect(panner);
-    panner.connect(audioEngine.effectsBus);
-  } else gain.connect(audioEngine.effectsBus);
-  oscillator.start(now);
-  oscillator.stop(now + duration + 0.03);
+  await audioEngine.cue(long ? "radioLong" : "radioShort", { pan });
   haptic(long ? "medium" : "light");
 }
 
@@ -2048,12 +2240,12 @@ async function renderSignalRitual() {
       state.signalRitual = result;
       state.signalAnswer = [];
       if (result.correct) {
-        void effect("purchase", 0.7);
+        void audioEngine.cue("radioSuccess");
         haptic("success");
         toast("Сигнал принят. Архив пополнился.", "success");
         await bootstrap({ quiet: true });
       } else {
-        void effect("impact", 0.28);
+        void audioEngine.cue("radioFail");
         haptic("warning");
         toast("Ритм не совпал. Приёмник всё ещё работает.", "warning");
       }
@@ -2321,11 +2513,15 @@ function openSheet(title, kicker, html) {
   $("#sheetKicker").textContent = kicker;
   $("#sheetBody").innerHTML = html;
   $("#sheet").showModal();
+  void audioEngine.cue("uiOpen");
   updateTelegramNavigation();
   haptic();
 }
 function closeSheet() {
-  if ($("#sheet").open) $("#sheet").close();
+  if ($("#sheet").open) {
+    $("#sheet").close();
+    void audioEngine.cue("uiClose");
+  }
   updateTelegramNavigation();
 }
 
@@ -2344,21 +2540,29 @@ $("#bottomNav").onclick = (event) => {
   if (button) void setTab(button.dataset.tab);
 };
 $("#soundButton").onclick = () => {
+  const opening = $("#soundPanel").classList.contains("hidden");
   $("#soundPanel").classList.toggle("hidden");
+  void audioEngine.cue(opening ? "uiOpen" : "uiClose");
   startHouseAudio();
   updateTelegramNavigation();
 };
 $("#soundClose").onclick = () => {
   $("#soundPanel").classList.add("hidden");
+  void audioEngine.cue("uiClose");
   updateTelegramNavigation();
 };
 $("#ambienceVolume").value = state.audio.ambience;
 $("#effectsVolume").value = state.audio.effects;
+$("#interfaceVolume").value = state.audio.interface;
 $("#muteToggle").checked = state.audio.mute;
 $("#vibrationToggle").checked = state.audio.vibration;
+$("#spatialToggle").checked = state.audio.spatial;
+$("#rareToggle").checked = state.audio.rare;
+$("#nightToggle").checked = state.audio.night;
 $("#motionToggle").checked = state.motionReduced;
 $("#ambienceValue").textContent = state.audio.ambience;
 $("#effectsValue").textContent = state.audio.effects;
+$("#interfaceValue").textContent = state.audio.interface;
 $("#soundIconUse")?.setAttribute(
   "href",
   `/assets/icons.svg#${state.audio.mute ? "mute" : "sound"}`,
@@ -2371,6 +2575,13 @@ $("#effectsVolume").oninput = (event) => {
   $("#effectsValue").textContent = event.target.value;
   updateAudio("effects", Number(event.target.value));
 };
+$("#interfaceVolume").oninput = (event) => {
+  $("#interfaceValue").textContent = event.target.value;
+  updateAudio("interface", Number(event.target.value));
+};
+$("#spatialToggle").onchange = (event) => updateAudio("spatial", event.target.checked);
+$("#rareToggle").onchange = (event) => updateAudio("rare", event.target.checked);
+$("#nightToggle").onchange = (event) => updateAudio("night", event.target.checked);
 $("#muteToggle").onchange = (event) =>
   updateAudio("mute", event.target.checked);
 $("#vibrationToggle").onchange = (event) =>
@@ -2382,12 +2593,53 @@ $("#motionToggle").onchange = (event) => {
 };
 $("#audioTest").onclick = () => audioEngine.testSpace();
 
-document.addEventListener("pointerdown", () => startHouseAudio(), {
-  once: true,
+let lastSliderSoundAt = 0;
+function interactionCueFor(element) {
+  if (!element) return null;
+  if (element.disabled || element.getAttribute("aria-disabled") === "true") return "uiDisabled";
+  if (element.dataset.sound) return element.dataset.sound;
+  if (element.matches("[data-tab]")) return null;
+  if (element.matches("[data-storage='withdraw'], [data-item-action='take']")) return "itemPickup";
+  if (element.matches("[data-storage='deposit'], [data-place], [data-interior]")) return "itemPlace";
+  if (element.matches("[data-vote], [data-coop-vote]")) return "vote";
+  if (element.matches("[data-daily-action], [data-story], [data-restore]")) return "paper";
+  if (element.matches("[data-gift], [data-send], [data-building='post']")) return "messageSend";
+  if (element.matches("[data-scene-look]")) return "camera";
+  if (element.matches("[data-scene-listen]")) return "uiCard";
+  if (element.classList.contains("danger")) return "uiWarning";
+  if (element.classList.contains("primary")) return "uiPrimary";
+  if (element.matches(".choice-button, .story-card, .market-item, .storage-item")) return "uiCard";
+  if (element.matches("#sheetClose, #soundClose")) return null;
+  return "uiTap";
+}
+
+document.addEventListener("pointerdown", (event) => {
+  startHouseAudio();
+  const element = event.target.closest("button, a, [role='button'], .choice-button, .market-item, .storage-item");
+  const cue = interactionCueFor(element);
+  if (cue) void audioEngine.cue(cue);
+}, { capture: true });
+
+document.addEventListener("change", (event) => {
+  if (event.target.matches("input[type='checkbox']"))
+    void audioEngine.cue(event.target.checked ? "uiToggleOn" : "uiToggleOff");
+  else if (event.target.matches("select")) void audioEngine.cue("uiCard");
 });
+
+document.addEventListener("input", (event) => {
+  if (!event.target.matches("input[type='range']")) return;
+  const now = performance.now();
+  if (now - lastSliderSoundAt < 65) return;
+  lastSliderSoundAt = now;
+  void audioEngine.cue("uiSlider", { rate: 0.88 + Number(event.target.value || 0) / 420 });
+});
+
+document.addEventListener("pointerdown", () => startHouseAudio(), { once: true });
 document.addEventListener("visibilitychange", () => {
-  if (document.hidden) clearTimeout(state.ambientTimer);
-  else startHouseAudio();
+  if (document.hidden) {
+    clearTimeout(state.ambientTimer);
+    void audioEngine.context?.suspend?.();
+  } else startHouseAudio();
 });
 
 window.addEventListener("beforeinstallprompt", (event) => {

@@ -92,7 +92,7 @@ if(!redis){
 }
 
 const publicDir=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'../public');
-const mime:Record<string,string>={'.html':'text/html; charset=utf-8','.css':'text/css; charset=utf-8','.js':'application/javascript; charset=utf-8','.svg':'image/svg+xml','.wav':'audio/wav','.ogg':'audio/ogg','.webm':'audio/webm','.png':'image/png','.webp':'image/webp','.ico':'image/x-icon'};
+const mime:Record<string,string>={'.html':'text/html; charset=utf-8','.css':'text/css; charset=utf-8','.js':'application/javascript; charset=utf-8','.svg':'image/svg+xml','.wav':'audio/wav','.m4a':'audio/mp4','.ogg':'audio/ogg','.webm':'audio/webm','.png':'image/png','.webp':'image/webp','.ico':'image/x-icon'};
 app.get('/*',async(request,reply)=>{const raw=String((request.params as Record<string,string>)['*']??'');const relative=raw===''?'index.html':raw;const normalized=path.normalize(relative).replace(/^([.][.][/\\])+/,'');let file=path.resolve(publicDir,normalized);if(!file.startsWith(`${publicDir}${path.sep}`)&&file!==publicDir)throw new AppError('Недопустимый путь',400,'INVALID_PATH');try{const stat=await fs.stat(file);if(stat.isDirectory())file=path.join(file,'index.html');}catch{file=path.join(publicDir,'index.html');}const ext=path.extname(file);const buffer=await fs.readFile(file);const noStore=ext==='.html'||path.basename(file)==='app.js';return reply.header('cache-control',noStore?'no-store':'public, max-age=3600').type(mime[ext]??'application/octet-stream').send(buffer);});
 
 await configureTelegram().catch(error=>app.log.error({error},'Telegram configuration failed'));
