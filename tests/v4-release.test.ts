@@ -46,10 +46,10 @@ test('share story artwork and expanded icon set are packaged',async()=>{
   for(const id of ['footprint','manager','motion','biometric','voice','architect','story'])assert.match(icons,new RegExp(`id="${id}"`));
 });
 
-test('release is versioned as 4.0.0 and includes a month of content seeds',async()=>{
+test('release is versioned as 4.0.1 and includes a month of content seeds',async()=>{
   const pkg=JSON.parse(await readFile('package.json','utf8'));
   const migration=await readFile('src/v4/migrations.ts','utf8');
-  assert.equal(pkg.version,'4.0.0');
+  assert.equal(pkg.version,'4.0.1');
   assert.match(migration,/cycle<4/);
   assert.match(migration,/coop-three-knocks/);
   assert.match(migration,/chapter-manager-ledger/);
@@ -93,4 +93,13 @@ test('all seventeen product additions have client, service and schema coverage',
     [service,/saveVoiceClip/],[service,/createUserRoom/],[service,/seasonArchive/],[migration,/cycle<4/],[webhook,/paysupport/]
   ];
   for(const [text,pattern] of markers)assert.match(text,pattern);
+});
+
+
+test('migration runner serializes concurrent Railway deployments',async()=>{
+  const source=await readFile('src/migrations.ts','utf8');
+  assert.match(source,/pg_advisory_lock/);
+  assert.match(source,/pg_advisory_unlock/);
+  assert.doesNotMatch(source,/DROP CONSTRAINT IF EXISTS expeditions_status_check/);
+  assert.match(source,/IF NOT EXISTS[\s\S]*expeditions_status_check/);
 });

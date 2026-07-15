@@ -56,8 +56,19 @@ export const migrationStatements = [
   started_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   completed_at TIMESTAMPTZ
 )`,
-`ALTER TABLE expeditions DROP CONSTRAINT IF EXISTS expeditions_status_check`,
-`ALTER TABLE expeditions ADD CONSTRAINT expeditions_status_check CHECK (status IN ('active','escaped','lost','cancelled'))`,
+`DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1
+    FROM pg_constraint
+    WHERE conrelid = 'expeditions'::regclass
+      AND conname = 'expeditions_status_check'
+  ) THEN
+    ALTER TABLE expeditions
+      ADD CONSTRAINT expeditions_status_check
+      CHECK (status IN ('active','escaped','lost','cancelled'));
+  END IF;
+END $$`,
 `CREATE UNIQUE INDEX IF NOT EXISTS one_active_expedition_per_user ON expeditions(user_id) WHERE status='active'`,
 `CREATE TABLE IF NOT EXISTS building_events (
   event_key TEXT PRIMARY KEY,
@@ -235,10 +246,27 @@ async function seedContent(): Promise<void> {
   for(const [key,value] of Object.entries(defaults)) await pool.query(`INSERT INTO system_settings(key,value) VALUES($1,$2) ON CONFLICT(key) DO NOTHING`,[key,JSON.stringify(value)]);
 }
 
+const MIGRATION_LOCK_KEY = 'eighth-floor:migrations:v4';
+
 export async function runMigrations(): Promise<void> {
-  for (const sql of migrationStatements) await pool.query(sql);
-  await pool.query(seedEventSql);
-  await seedContent();
-  await runV2Migrations();
-  await runV4Migrations();
+  // Railway may briefly run the old and new deployment at the same time.
+  // A session-level PostgreSQL advisory lock guarantees that only one process
+  // changes the schema or seed data at a time. The lock is released
+  // automatically if the process or connection terminates unexpectedly.
+  const lockClient = await pool.connect();
+  try {
+    await lockClient.query('SELECT pg_advisory_lock(hashtext($1))', [MIGRATION_LOCK_KEY]);
+
+    for (const sql of migrationStatements) await pool.query(sql);
+    await pool.query(seedEventSql);
+    await seedContent();
+    await runV2Migrations();
+    await runV4Migrations();
+  } finally {
+    try {
+      await lockClient.query('SELECT pg_advisory_unlock(hashtext($1))', [MIGRATION_LOCK_KEY]);
+    } finally {
+      lockClient.release();
+    }
+  }
 }
