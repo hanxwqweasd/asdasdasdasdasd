@@ -205,7 +205,7 @@ PRE_MIGRATION_BACKUP_REQUIRED=false
 ENABLE_METRICS=true
 METRICS_TOKEN=необязательный_секрет_не_короче_16_символов
 SENTRY_DSN=
-APP_VERSION=2.0.0
+APP_VERSION=3.0.0
 ```
 
 Если сервисы Railway называются не `Postgres` и `Redis`, замените имена внутри reference variables на фактические.
@@ -280,7 +280,6 @@ load-tests/                HTTP, WebSocket и co-op тесты
 - Настоящее массовое списание Stars нельзя корректно симулировать без Telegram; тестируется серверная идемпотентность fulfillment, а финальный invoice-flow нужно пройти реальным тестовым аккаунтом.
 - Volume `/backups` защищает от пересоздания контейнера, но не заменяет независимое внешнее хранилище.
 - Перед широкой рекламой настройте Sentry, внешний uptime-check, внешний backup endpoint и лимиты PostgreSQL connections.
-
 
 ## PostgreSQL 18 backup compatibility
 

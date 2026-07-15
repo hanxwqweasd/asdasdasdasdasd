@@ -2,55 +2,127 @@
 <html lang="ru">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
-  <meta name="theme-color" content="#0c0b0a">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no,interactive-widget=resizes-content">
+  <meta name="theme-color" content="#0b0a09">
   <meta name="color-scheme" content="dark">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="description" content="Восьмого этажа нет — атмосферная социальная игра для Telegram Mini Apps">
   <title>Восьмого этажа нет</title>
-  <link rel="stylesheet" href="/styles.css">
-  <script src="https://telegram.org/js/telegram-web-app.js?63"></script>
+  <link rel="manifest" href="/manifest.webmanifest">
+  <link rel="icon" type="image/png" sizes="192x192" href="/icons/icon-192.png">
+  <link rel="preload" href="/audio/rain-window.ogg" as="audio" type="audio/ogg">
+  <link rel="preload" href="/audio/lamp-hum.ogg" as="audio" type="audio/ogg">
+  <link rel="stylesheet" href="/styles.css?v=3.0.0">
+  <script src="https://telegram.org/js/telegram-web-app.js?66"></script>
   <script src="/socket.io/socket.io.js"></script>
 </head>
 <body>
-  <div class="weather-layer" aria-hidden="true"><div class="rain"></div><div class="window-glow"></div><div class="grain"></div></div>
+  <div class="weather-layer" aria-hidden="true">
+    <div class="weather-depth depth-far"></div>
+    <div class="rain rain-far"></div>
+    <div class="rain rain-near"></div>
+    <div class="window-glow"></div>
+    <div class="vignette"></div>
+    <div class="grain"></div>
+  </div>
+
+  <div id="bootScene" class="boot-scene" aria-live="polite">
+    <div class="boot-lift" aria-hidden="true">
+      <div class="boot-panel"><span id="bootFloor">7</span><i></i></div>
+      <div class="boot-door boot-left"></div>
+      <div class="boot-door boot-right"></div>
+      <div class="boot-gap"></div>
+    </div>
+    <div class="boot-copy">
+      <span>ДОМ № 8 · ПОДЪЕЗД С</span>
+      <h1>ВОСЬМОГО ЭТАЖА НЕТ</h1>
+      <p id="bootStatus">Лифт проверяет ваше имя…</p>
+    </div>
+  </div>
+
+  <div id="floorTransition" class="floor-transition hidden" aria-hidden="true">
+    <div class="transition-shaft">
+      <div class="shaft-lines"></div>
+      <div class="transition-panel">
+        <small>ЭТАЖ</small>
+        <strong id="transitionFloor">8</strong>
+        <span id="transitionLabel">Лифт движется</span>
+      </div>
+      <div class="transition-door transition-left"></div>
+      <div class="transition-door transition-right"></div>
+      <div class="transition-light"></div>
+    </div>
+  </div>
+
   <main class="app-shell" id="appShell">
     <header class="topbar">
-      <button class="house-seal" data-tab="home" aria-label="Дом"><span>VIII</span></button>
-      <div class="brand-copy"><b>ВОСЬМОГО ЭТАЖА НЕТ</b><small id="buildingClock">00:08 · дом не спит</small></div>
-      <button id="soundButton" class="round-button" aria-label="Настройки звука">◒</button>
+      <button class="house-seal" data-tab="home" aria-label="Перейти на восьмой этаж">
+        <span>VIII</span><i></i>
+      </button>
+      <div class="brand-copy">
+        <b>ВОСЬМОГО ЭТАЖА НЕТ</b>
+        <small id="buildingClock">00:08 · дом не спит</small>
+      </div>
+      <div class="top-actions">
+        <button id="installButton" class="round-button hidden" aria-label="Добавить игру на главный экран">
+          <svg class="ui-icon"><use href="/assets/icons.svg#plus"></use></svg>
+        </button>
+        <button id="soundButton" class="round-button" aria-label="Настройки звука">
+          <svg class="ui-icon"><use id="soundIconUse" href="/assets/icons.svg#sound"></use></svg>
+          <i class="audio-pulse" aria-hidden="true"></i>
+        </button>
+      </div>
     </header>
 
-    <section class="resident-strip" id="residentStrip">
-      <div><small>КВ.</small><strong id="apartmentNo">—</strong></div>
-      <div><small>НЕРВЫ</small><strong id="nerve">100</strong></div>
-      <div><small>ДОВЕРИЕ</small><strong id="trust">0</strong></div>
-      <div><small>УЛИКИ</small><strong id="clues">0</strong></div>
-      <div><small>МАРКИ</small><strong id="marks">0</strong></div>
+    <section class="resident-strip" id="residentStrip" aria-label="Показатели жильца">
+      <div data-stat="apartment"><svg class="stat-icon"><use href="/assets/icons.svg#door"></use></svg><span><small>КВ.</small><strong id="apartmentNo">—</strong></span></div>
+      <div data-stat="nerve"><svg class="stat-icon"><use href="/assets/icons.svg#nerve"></use></svg><span><small>НЕРВЫ</small><strong id="nerve">100</strong></span></div>
+      <div data-stat="trust"><svg class="stat-icon"><use href="/assets/icons.svg#trust"></use></svg><span><small>ДОВЕРИЕ</small><strong id="trust">0</strong></span></div>
+      <div data-stat="clues"><svg class="stat-icon"><use href="/assets/icons.svg#clue"></use></svg><span><small>УЛИКИ</small><strong id="clues">0</strong></span></div>
+      <div data-stat="marks"><svg class="stat-icon"><use href="/assets/icons.svg#marks"></use></svg><span><small>МАРКИ</small><strong id="marks">0</strong></span></div>
     </section>
 
     <button id="dailyRibbon" class="daily-ribbon hidden"></button>
-    <section id="view" class="view"><div class="loading-scene"><i></i><p>Лифт считает этажи…</p></div></section>
+    <section id="view" class="view" aria-live="polite">
+      <div class="loading-scene"><i></i><p>Лифт считает этажи…</p></div>
+    </section>
 
-    <nav class="bottom-nav" id="bottomNav">
-      <button data-tab="home" class="active"><span>⌁</span><small>Этаж</small></button>
-      <button data-tab="coop"><span>◫</span><small>Вместе</small><i id="coopDot"></i></button>
-      <button data-tab="building"><span>▥</span><small>Подъезд</small></button>
-      <button data-tab="archive"><span>▤</span><small>Архив</small></button>
-      <button data-tab="market"><span>◇</span><small>Рынок</small></button>
-      <button data-tab="more"><span>•••</span><small>Ещё</small></button>
+    <nav class="bottom-nav" id="bottomNav" aria-label="Основная навигация">
+      <button data-tab="home" class="active"><svg class="nav-icon"><use href="/assets/icons.svg#elevator"></use></svg><small>Этаж</small></button>
+      <button data-tab="coop"><svg class="nav-icon"><use href="/assets/icons.svg#coop"></use></svg><small>Вместе</small><i id="coopDot" class="connection-dot hidden"></i></button>
+      <button data-tab="building"><svg class="nav-icon"><use href="/assets/icons.svg#building"></use></svg><small>Подъезд</small></button>
+      <button data-tab="archive"><svg class="nav-icon"><use href="/assets/icons.svg#archive"></use></svg><small>Архив</small></button>
+      <button data-tab="market"><svg class="nav-icon"><use href="/assets/icons.svg#market"></use></svg><small>Рынок</small></button>
+      <button data-tab="more"><svg class="nav-icon"><use href="/assets/icons.svg#more"></use></svg><small>Ещё</small></button>
     </nav>
   </main>
 
   <section id="tutorialOverlay" class="tutorial-overlay hidden" aria-live="polite"></section>
-  <dialog id="sheet" class="sheet"><div class="sheet-card"><header><div><small id="sheetKicker"></small><h2 id="sheetTitle"></h2></div><button id="sheetClose" class="round-button">×</button></header><div id="sheetBody"></div></div></dialog>
-  <aside id="soundPanel" class="sound-panel hidden">
-    <header><div><small>АУДИО ДОМА</small><h3>Слышать стены</h3></div><button id="soundClose" class="round-button">×</button></header>
+
+  <dialog id="sheet" class="sheet">
+    <div class="sheet-card">
+      <div class="sheet-handle" aria-hidden="true"></div>
+      <header><div><small id="sheetKicker"></small><h2 id="sheetTitle"></h2></div><button id="sheetClose" class="round-button" aria-label="Закрыть"><svg class="ui-icon"><use href="/assets/icons.svg#close"></use></svg></button></header>
+      <div id="sheetBody"></div>
+    </div>
+  </dialog>
+
+  <aside id="soundPanel" class="sound-panel hidden" aria-label="Настройки звука">
+    <header><div><small>АУДИО ДОМА</small><h3>Слышать стены</h3></div><button id="soundClose" class="round-button" aria-label="Закрыть"><svg class="ui-icon"><use href="/assets/icons.svg#close"></use></svg></button></header>
+    <div class="headphone-callout"><svg class="ui-icon"><use href="/assets/icons.svg#headphones"></use></svg><div><b>Наденьте наушники</b><p>Некоторые подсказки живут слева или справа от двери.</p></div></div>
     <label>Окружение <output id="ambienceValue">55</output><input id="ambienceVolume" type="range" min="0" max="100" value="55"></label>
     <label>События <output id="effectsValue">70</output><input id="effectsVolume" type="range" min="0" max="100" value="70"></label>
     <label class="switch-row"><span>Вибрация</span><input id="vibrationToggle" type="checkbox" checked></label>
     <label class="switch-row"><span>Полная тишина</span><input id="muteToggle" type="checkbox"></label>
-    <p>В наушниках слышны подсказки, которых нет в тексте.</p>
+    <label class="switch-row"><span>Уменьшить анимации</span><input id="motionToggle" type="checkbox"></label>
+    <button id="audioTest" class="secondary full"><svg class="button-icon"><use href="/assets/icons.svg#signal"></use></svg>Проверить пространство</button>
   </aside>
-  <div id="toast" class="toast"></div>
-  <script type="module" src="/app.js?v=2.0.5-signaturefix"></script>
+
+  <div id="networkBanner" class="network-banner hidden"><svg class="ui-icon"><use href="/assets/icons.svg#warning"></use></svg><span>Связь с домом прервана. Действия будут повторены после восстановления.</span></div>
+  <div id="toast" class="toast" role="status"></div>
+
+  <script type="module" src="/app.js?v=3.0.0"></script>
 </body>
 </html>

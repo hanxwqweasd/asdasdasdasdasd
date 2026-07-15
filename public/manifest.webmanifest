@@ -1,0 +1,15 @@
+{
+  "name": "Восьмого этажа нет",
+  "short_name": "8 этаж",
+  "description": "Атмосферная социальная игра для Telegram Mini Apps",
+  "start_url": "/?source=homescreen",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#090807",
+  "theme_color": "#0c0b0a",
+  "icons": [
+    {"src":"/icons/icon-192.png","sizes":"192x192","type":"image/png","purpose":"any maskable"},
+    {"src":"/icons/icon-512.png","sizes":"512x512","type":"image/png","purpose":"any maskable"}
+  ]
+}

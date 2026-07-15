@@ -1,121 +1,2284 @@
-const tg=window.Telegram?.WebApp;
-if(tg){tg.ready();tg.expand();tg.setHeaderColor('#0c0b0a');tg.setBackgroundColor('#0c0b0a');tg.disableVerticalSwipes?.();}
-const $=(s,r=document)=>r.querySelector(s);const $$=(s,r=document)=>[...r.querySelectorAll(s)];
-const esc=v=>String(v??'').replace(/[&<>'"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c]));
-const fmtDate=v=>v?new Intl.DateTimeFormat('ru-RU',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'}).format(new Date(v)):'—';
-const opId=()=>crypto.randomUUID?.()||`${Date.now()}-${Math.random()}`;
-const devUser=new URLSearchParams(location.search).get('user')||localStorage.getItem('ef_dev_user')||'10001';
-let telegramInitData='';
-function initDataFromLaunchParams(){for(const raw of [location.hash.replace(/^#/,''),location.search.replace(/^\?/, '')]){if(!raw)continue;const params=new URLSearchParams(raw);const value=params.get('tgWebAppData');if(value)return value;}return'';}
-function resolveTelegramInitData(){const value=window.Telegram?.WebApp?.initData||initDataFromLaunchParams()||sessionStorage.getItem('ef_tg_init_data')||'';if(value){telegramInitData=value;sessionStorage.setItem('ef_tg_init_data',value);}return value;}
-async function waitForTelegramInitData(timeoutMs=7000){const started=Date.now();let value=resolveTelegramInitData();while(!value&&Date.now()-started<timeoutMs){await new Promise(r=>setTimeout(r,100));value=resolveTelegramInitData();}return value;}
-function telegramDiagnostics(){return{sdk:Boolean(window.Telegram?.WebApp),platform:window.Telegram?.WebApp?.platform||'unknown',version:window.Telegram?.WebApp?.version||'unknown',initDataLength:resolveTelegramInitData().length,launchParam:Boolean(initDataFromLaunchParams()),visibility:document.visibilityState};}
-const state={base:null,v2:null,tab:'home',archiveTab:'apartment',marketTab:'market',moreTab:'settings',expedition:null,selectedItem:null,coop:null,socket:null,sessionId:sessionStorage.getItem('ef_session')||opId(),assignments:{},audio:{ambience:+localStorage.getItem('ef_ambience')||55,effects:+localStorage.getItem('ef_effects')||70,mute:localStorage.getItem('ef_mute')==='1',vibration:localStorage.getItem('ef_vibration')!=='0'},loops:{},ambientTimer:null,tutorialInspect:new Set(),dailyOpen:false};
-sessionStorage.setItem('ef_session',state.sessionId);
-const view=$('#view'),toastEl=$('#toast');
+const APP_VERSION = "3.0.0";
+const tg = window.Telegram?.WebApp;
 
-async function api(path,options={}){const method=options.method||'GET';const headers={'x-telegram-init-data':resolveTelegramInitData(),'x-dev-user-id':devUser,...options.headers};if(options.body!==undefined){headers['content-type']='application/json';if(!headers['x-idempotency-key']&&method!=='GET')headers['x-idempotency-key']=opId();}const response=await fetch(path,{...options,method,headers});const payload=await response.json().catch(()=>({}));if(!response.ok){const error=new Error(payload.error||payload.message||`Ошибка ${response.status}`);error.code=payload.code;error.status=response.status;throw error;}return payload;}
-function toast(text){toastEl.textContent=text;toastEl.classList.add('show');clearTimeout(toastEl._t);toastEl._t=setTimeout(()=>toastEl.classList.remove('show'),2800);}
-function haptic(type='light'){if(state.audio.vibration)tg?.HapticFeedback?.impactOccurred?.(type);}
-function effect(name,volume=1){if(state.audio.mute)return;const audio=new Audio(`/audio/${name}.wav`);audio.volume=Math.min(1,state.audio.effects/100*volume);audio.play().catch(()=>{});}
-function ambient(name,volume=1){if(state.audio.mute||state.audio.ambience===0)return;const audio=new Audio(`/audio/${name}.ogg`);audio.volume=Math.min(1,state.audio.ambience/100*volume);audio.play().catch(()=>{});}
-function loop(name,volume=1){if(state.audio.mute||state.audio.ambience===0)return;let a=state.loops[name];if(!a){a=new Audio(`/audio/${name}.ogg`);a.loop=true;state.loops[name]=a;}a.volume=Math.min(1,state.audio.ambience/100*volume);a.play().catch(()=>{});}
-function stopLoops(except=[]){clearTimeout(state.ambientTimer);state.ambientTimer=null;for(const[name,a]of Object.entries(state.loops)){if(except.includes(name)){a.volume=Math.min(1,state.audio.ambience/100*.55);continue;}a.pause();a.currentTime=0;}}
-function scheduleAmbient(){clearTimeout(state.ambientTimer);if(state.audio.mute||state.audio.ambience===0)return;const pools={home:['pipes','neighbor','television','wind','elevator-bell'],coop:['footsteps','whisper','pipes','intercom'],building:['neighbor','television','intercom','pipes'],archive:['camera','wind','television'],market:['footsteps','neighbor','elevator-bell'],more:['pipes','wind','intercom']};const sounds=pools[state.tab]||pools.home;state.ambientTimer=setTimeout(()=>{ambient(sounds[Math.floor(Math.random()*sounds.length)],.18+Math.random()*.22);scheduleAmbient();},12000+Math.random()*23000);}
-function startHouseAudio(){if(state.audio.mute)return;loop('rain-window',.45);loop(state.tab==='coop'?'floor-ambience':'lamp-hum',.34);scheduleAmbient();}
-function track(eventName,properties={}){api('/api/analytics',{method:'POST',body:JSON.stringify({eventName,properties,sessionId:state.sessionId,appVersion:state.v2?.appVersion||'2.0.5',assignments:state.assignments})}).catch(()=>{});}
+if (tg) {
+  tg.ready();
+  tg.expand();
+  tg.setHeaderColor?.("#0b0a09");
+  tg.setBackgroundColor?.("#090807");
+  tg.setBottomBarColor?.("#100e0c");
+  tg.disableVerticalSwipes?.();
+  tg.enableClosingConfirmation?.();
+  if (tg.isVersionAtLeast?.("8.0")) {
+    try {
+      tg.lockOrientation?.();
+      setTimeout(() => tg.requestFullscreen?.(), 180);
+    } catch {}
+  }
+}
 
-async function bootstrap({preserveTab=true}={}){try{await waitForTelegramInitData();const [base,v2]=await Promise.all([api('/api/bootstrap'),api('/api/v2/bootstrap')]);state.base=base;state.v2=v2;state.expedition=base.activeExpedition;state.assignments=Object.fromEntries(Object.entries(v2.experiments||{}).map(([key,value])=>[key,value?.variant||String(value)]));renderStatus();renderDailyRibbon();if(v2.activeCoop)connectCoop(v2.activeCoop);if(!v2.tutorial.completed_at)renderTutorial();else $('#tutorialOverlay').classList.add('hidden');render();track('app_open',{tab:state.tab});}catch(error){renderLaunchError(error);}}
-async function renderLaunchError(error){const diagnostic=telegramDiagnostics();let botUsername='';try{botUsername=(await fetch('/api/public-config',{cache:'no-store'}).then(r=>r.json())).botUsername||'';}catch{}const noInitData=!diagnostic.initDataLength||error.code==='TELEGRAM_AUTH_REQUIRED';const invalidInitData=error.code==='TELEGRAM_AUTH_INVALID'||error.code==='TELEGRAM_AUTH_EXPIRED';const explanation=noInitData?`<p>Telegram не передал подписанные данные запуска. Закройте это окно и откройте игру новой кнопкой <b>«Открыть двери лифта»</b> в личном чате с ботом.</p>`:invalidInitData?`<p>Telegram передал данные запуска, но сервер отклонил их проверку. После обновления до версии 2.0.5 поле <code>signature</code> проверяется корректно. Если ошибка останется, проверьте, что <code>BOT_TOKEN</code> принадлежит именно этому боту.</p>`:`<p>Сервер ответил ошибкой. Повторите запрос после перезапуска Mini App.</p>`;view.innerHTML=`<div class="card launch-error"><span class="eyebrow">ДИАГНОСТИКА ВХОДА</span><h3>Двери не открылись</h3><p>${esc(error.message)}</p>${explanation}<div class="button-row"><button class="primary" id="authRetry">Проверить ещё раз</button>${botUsername?'<button class="secondary" id="authReopen">Открыть через бота</button>':''}</div><details><summary>Техническая информация</summary><pre>${esc(JSON.stringify({...diagnostic,serverCode:error.code||null,httpStatus:error.status||null},null,2))}</pre></details></div>`;$('#authRetry').onclick=async()=>{sessionStorage.removeItem('ef_tg_init_data');telegramInitData='';location.reload();};if(botUsername)$('#authReopen').onclick=()=>{const link=`https://t.me/${botUsername.replace(/^@/,'')}?start=app`;if(tg?.openTelegramLink)tg.openTelegramLink(link);else location.href=link;};}
-function renderStatus(){const p=state.base.profile;$('#apartmentNo').textContent=p.apartment_no;$('#nerve').textContent=p.nerve;$('#trust').textContent=p.trust;$('#clues').textContent=p.clues;$('#marks').textContent=p.house_marks??0;}
-function renderDailyRibbon(){const d=state.v2.daily?.scenario,r=$('#dailyRibbon');if(!d){r.classList.add('hidden');return;}r.classList.remove('hidden');r.innerHTML=`<b>${esc(d.title)}</b><small>${state.v2.daily.progress?.completed_at?'История завершена сегодня':'Сегодня · '+esc(d.teaser)}</small>`;}
-function setTab(tab){state.tab=tab;$$('#bottomNav button').forEach(b=>b.classList.toggle('active',b.dataset.tab===tab));haptic();stopLoops();startHouseAudio();render();track('tab_open',{tab});}
-function render(){if(!state.base||!state.v2)return;const map={home:renderHome,coop:renderCoop,building:renderBuilding,archive:renderArchive,market:renderMarket,more:renderMore};map[state.tab]?.();}
-function section(title,text,action=''){return`<div class="section-head"><div><h2>${esc(title)}</h2>${text?`<p>${esc(text)}</p>`:''}</div>${action}</div>`;}
-function cinematic({kicker='00:08',title='Этажа нет на плане',text='За дверью кто-то ждёт, пока вы первым назовёте своё имя.',number='8',shadow=true}={}){return`<div class="cinematic"><div class="lamp-cone"></div><div class="bulb"></div><div class="corridor-floor"></div><div class="hall-door" data-number="${esc(number)}"></div>${shadow?'<div class="shadow-person"></div>':''}<div class="scene-caption"><span class="eyebrow">${esc(kicker)}</span><h2>${esc(title)}</h2><p>${esc(text)}</p></div></div>`;}
+const $ = (selector, root = document) => root.querySelector(selector);
+const $$ = (selector, root = document) => [...root.querySelectorAll(selector)];
+const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+const icon = (name, className = "ui-icon") =>
+  `<svg class="${className}" aria-hidden="true"><use href="/assets/icons.svg#${name}"></use></svg>`;
+const esc = (value) =>
+  String(value ?? "").replace(
+    /[&<>'"]/g,
+    (character) =>
+      ({
+        "&": "&amp;",
+        "<": "&lt;",
+        ">": "&gt;",
+        "'": "&#39;",
+        '"': "&quot;",
+      })[character],
+  );
+const fmtDate = (value) =>
+  value
+    ? new Intl.DateTimeFormat("ru-RU", {
+        day: "2-digit",
+        month: "short",
+        hour: "2-digit",
+        minute: "2-digit",
+      }).format(new Date(value))
+    : "—";
+const opId = () => crypto.randomUUID?.() || `${Date.now()}-${Math.random()}`;
+const devUser =
+  new URLSearchParams(location.search).get("user") ||
+  localStorage.getItem("ef_dev_user") ||
+  "10001";
 
-function renderHome(){const e=state.base.event,d=state.v2.daily;if(state.expedition?.status==='active')return renderSoloExpedition();view.innerHTML=`${e?`<div class="card daily-scene"><span class="eyebrow">ОБЩЕДОМОВОЕ ПРОИСШЕСТВИЕ</span><h3>${esc(e.title)}</h3><p>${esc(e.body)}</p></div>`:''}${cinematic({kicker:'ЛИФТ · МЕЖДУ 7 И 9',title:'Восьмой этаж снова существует',text:'Один путь — тихий. Второй — короткий. Оба заканчиваются у одной двери.'})}<div class="button-row" style="margin-top:9px"><button class="primary" data-action="solo-start">Войти одному</button><button class="secondary" data-action="coop-open">Позвать жильцов</button></div>${d?.scenario?renderDailyCard(d):''}${section('Что изменилось','Дом запоминает поступки, а не серию входов.')}${renderStoryPreview()}`;bindHome();}
-function renderDailyCard(d){const progress=d.progress||{},scenes=d.scenario.scenes||[],scene=scenes[Number(progress.step)||0];return`<article class="card daily-scene" style="margin-top:10px"><span class="eyebrow">СЦЕНАРИЙ ДНЯ</span><h3>${esc(d.scenario.title)}</h3><p>${esc(scene?.text||d.scenario.teaser)}</p><div class="timeline">${scenes.map((_,i)=>`<i class="${i<=Number(progress.step)?'done':''}"></i>`).join('')}</div>${progress.completed_at?'<span class="pill ok">Дом записал последствия</span>':`<div class="button-row">${(scene?.actions||[]).map(a=>`<button class="secondary" data-daily-action="${esc(a.key)}" data-id="${d.scenario.id}">${esc(a.label)}</button>`).join('')}</div>`}</article>`;}
-function renderStoryPreview(){const items=state.v2.storylines||[];if(!items.length)return`<div class="card story-card"><h3>Дом пока наблюдает</h3><p>После нескольких решений появится личная сюжетная линия: архив, радиорубка, фотограф или поддельные документы.</p></div>`;return items.slice(0,2).map(x=>`<div class="card story-card"><span class="eyebrow">ЛИЧНОЕ ДЕЛО · ГЛАВА ${Number(x.chapter)+1}</span><h3>${esc(x.title)}</h3><p>${esc(x.description)}</p><button class="secondary" data-story="${x.id}">Продолжить</button></div>`).join('');}
-function bindHome(){$('[data-action="solo-start"]')?.addEventListener('click',startExpedition);$('[data-action="coop-open"]')?.addEventListener('click',()=>setTab('coop'));$$('[data-daily-action]').forEach(b=>b.onclick=()=>dailyAction(b.dataset.id,b.dataset.dailyAction));$$('[data-story]').forEach(b=>b.onclick=()=>storyChoice(b.dataset.story));}
-async function dailyAction(id,action){try{haptic();effect('paper');const result=await api(`/api/daily/${id}/action`,{method:'POST',body:JSON.stringify({action,operationId:opId()})});toast(result.completed?'Событие завершено. Последствия останутся.':'Дом изменил следующую сцену');await bootstrap();}catch(e){toast(e.message);}}
-async function storyChoice(id){openSheet('Личное дело','Дом помнит ваш характер',`<p>Это решение станет частью персональной линии.</p><div class="button-row"><button class="secondary" data-choice="investigate">Проверить факты</button><button class="secondary" data-choice="hide">Скрыть находку</button></div>`);$$('[data-choice]',$('#sheetBody')).forEach(b=>b.onclick=async()=>{await api(`/api/storylines/${id}/choice`,{method:'POST',body:JSON.stringify({choice:b.dataset.choice})});closeSheet();toast('Запись добавлена в личное дело');await bootstrap();});}
+const prefersReducedMotion = matchMedia(
+  "(prefers-reduced-motion: reduce)",
+).matches;
+const memory = Number(navigator.deviceMemory || 4);
+const cores = Number(navigator.hardwareConcurrency || 4);
+const lowPerformance = memory <= 2 || cores <= 2;
+const savedMotion = localStorage.getItem("ef_reduce_motion");
+const reduceMotion =
+  savedMotion == null
+    ? prefersReducedMotion || lowPerformance
+    : savedMotion === "1";
+document.body.classList.toggle("reduce-motion", reduceMotion);
+document.body.classList.toggle("low-performance", lowPerformance);
 
-function roomScene(exp){const r=exp.room,s=exp.state;return`${cinematic({kicker:`КОМНАТА ${exp.roomIndex+1} ИЗ ${s.maxRooms} · ${r.ambience}`,title:r.title,text:r.description,number:String(exp.roomIndex+8),shadow:s.danger>35})}<div class="meter-grid"><div class="meter"><label>Самообладание <b>${s.nerve}</b></label><i style="--v:${s.nerve}%"></i></div><div class="meter"><label>Опасность <b>${s.danger}</b></label><i style="--v:${s.danger}%"></i></div><div class="meter"><label>Шум <b>${s.noise}</b></label><i style="--v:${s.noise}%"></i></div></div><div class="choice-list">${r.choices.map((c,i)=>`<button class="choice-button" data-solo-choice="${i}"><b>${esc(c.label)}</b><small>${c.requires?'нужен предмет: '+esc(c.requires):'дом запомнит решение'}</small></button>`).join('')}</div>`;}
-function renderSoloExpedition(){view.innerHTML=roomScene(state.expedition);$$('[data-solo-choice]').forEach(b=>b.onclick=()=>chooseSolo(Number(b.dataset.soloChoice)));loop('floor-ambience',.35);if(state.expedition.state.danger>40)loop('whisper',.18);}
-async function startExpedition(){try{haptic('medium');effect('elevator');state.expedition=await api('/api/expeditions/start',{method:'POST',body:'{}'});track('expedition_start');renderHome();}catch(e){toast(e.message);}}
-async function chooseSolo(choiceIndex){try{$$('[data-solo-choice]').forEach(x=>x.disabled=true);effect('door');const result=await api(`/api/expeditions/${state.expedition.id}/action`,{method:'POST',body:JSON.stringify({choiceIndex,operationId:opId()})});toast(result.outcome);track('room_choice',{roomId:state.expedition.room?.id,choiceIndex,status:result.status});state.expedition={...state.expedition,...result};if(result.status==='active'){effect('room');setTimeout(renderHome,250);}else{effect(result.status==='escaped'?'elevator':'impact');view.innerHTML=`<div class="card" style="text-align:center;padding:30px"><span class="eyebrow">ВЫЛАЗКА ЗАВЕРШЕНА</span><h2 style="font-family:PT Serif">${result.status==='escaped'?'Лифт вернул вас домой':'Коридор закрылся раньше'}</h2><p>Улики: ${result.state.clues} · опасность: ${result.state.danger}</p><button class="primary" id="soloReturn">Вернуться в квартиру</button></div>`;$('#soloReturn').onclick=async()=>{state.expedition=null;await bootstrap();};}}catch(e){toast(e.message);renderHome();}}
+let telegramInitData = "";
+function initDataFromLaunchParams() {
+  for (const raw of [
+    location.hash.replace(/^#/, ""),
+    location.search.replace(/^\?/, ""),
+  ]) {
+    if (!raw) continue;
+    const params = new URLSearchParams(raw);
+    const value = params.get("tgWebAppData");
+    if (value) return value;
+  }
+  return "";
+}
+function resolveTelegramInitData() {
+  const value =
+    window.Telegram?.WebApp?.initData ||
+    initDataFromLaunchParams() ||
+    sessionStorage.getItem("ef_tg_init_data") ||
+    "";
+  if (value) {
+    telegramInitData = value;
+    sessionStorage.setItem("ef_tg_init_data", value);
+  }
+  return value;
+}
+async function waitForTelegramInitData(timeoutMs = 8000) {
+  const started = Date.now();
+  let value = resolveTelegramInitData();
+  while (!value && Date.now() - started < timeoutMs) {
+    await wait(100);
+    value = resolveTelegramInitData();
+  }
+  return value;
+}
+function telegramDiagnostics() {
+  return {
+    sdk: Boolean(window.Telegram?.WebApp),
+    platform: window.Telegram?.WebApp?.platform || "unknown",
+    version: window.Telegram?.WebApp?.version || "unknown",
+    initDataLength: resolveTelegramInitData().length,
+    launchParam: Boolean(initDataFromLaunchParams()),
+    visibility: document.visibilityState,
+    online: navigator.onLine,
+    appVersion: APP_VERSION,
+  };
+}
 
-function socketEmit(event,payload={}){return new Promise((resolve,reject)=>{if(!state.socket?.connected)return reject(new Error('Нет соединения с домом'));state.socket.timeout(7000).emit(event,payload,(err,res)=>err?reject(new Error('Дом не ответил')):res?.ok?resolve(res.data):reject(new Error(res?.error||'Операция не выполнена')));});}
-function connectCoop(active=null){if(!state.socket){state.socket=window.io({path:'/socket.io',auth:{initData:resolveTelegramInitData(),devUserId:devUser},transports:['websocket','polling'],reconnection:true,reconnectionAttempts:20,reconnectionDelay:700});state.socket.on('connect',()=>{$('#coopDot').classList.remove('hidden');if(active?.id)socketEmit('coop:resume',{matchId:active.id}).catch(()=>{});});state.socket.on('disconnect',()=>$('#coopDot').classList.add('hidden'));state.socket.on('coop:state',data=>{state.coop=data;if(state.tab==='coop')renderCoop();});state.socket.on('coop:matched',data=>{state.coop=data;toast('Лифт нашёл попутчиков');setTab('coop');});state.socket.on('connect_error',e=>console.warn('socket',e.message));}else if(active?.id&&state.socket.connected)socketEmit('coop:resume',{matchId:active.id}).catch(()=>{});}
-function renderCoop(){connectCoop(state.v2.activeCoop);if(!state.coop)return renderCoopEntry();const c=state.coop;if(['escaped','lost','cancelled'].includes(c.phase))return renderCoopEnd(c);const room=c.rooms?.[0];const remaining=c.elevatorDeadlineAt?Math.max(0,Math.ceil((c.elevatorDeadlineAt-(c.serverTime||Date.now()))/1000)):null;view.innerHTML=`${section(c.phase==='lobby'?'Лифт ждёт жильцов':'Совместная вылазка',c.phase==='lobby'?'Код комнаты можно отправить знакомым.':'Каждый видит только часть происходящего.')}<div class="coop-lift"><div class="coop-code">${esc(c.code)}</div><div class="residents-grid">${c.players.map(p=>`<div class="resident"><span class="resident-avatar">${esc(p.name?.[0]||'?')}</span><div><b>${esc(p.name)}</b><small>${p.ready?'готов':'не готов'}${p.role?' · '+esc(p.role):''}</small></div><i class="dot ${p.connected?'online':''}"></i></div>`).join('')}</div>${c.private?.hint?`<div class="private-note"><b>Только вы видите:</b><br>${esc(c.private.hint)}</div>`:''}${c.private?.objective?`<div class="private-note"><b>Скрытая цель:</b><br>${esc(c.private.objective)}</div>`:''}${c.phase==='playing'?`<div class="card-row"><div class="grow"><small>ДО ЗАКРЫТИЯ ЛИФТА</small><div class="countdown" data-deadline="${c.elevatorDeadlineAt}">${formatTime(remaining)}</div></div><span class="pill warn">комната ${c.roomIndex+1}/${c.roomsTotal||6}</span></div>`:''}</div>${c.phase==='lobby'?renderLobbyControls(c):renderCoopPlay(c,room)}<div class="card"><h3>Записи группы</h3>${c.log.slice(-5).map(x=>`<p>${esc(x)}</p>`).join('')}</div>`;bindCoop(c);if(c.phase==='playing')startCoopTimer();loop('floor-ambience',.5);}
-function renderCoopEntry(){view.innerHTML=`${section('Войти вместе','2–4 реальных игрока. Один коридор, разные подсказки.')}${cinematic({kicker:'КООПЕРАТИВНАЯ НОЧЬ',title:'Лифт не поедет с одним пассажиром',text:'Создайте комнату, введите код знакомого или доверьтесь подбору.',shadow:false})}<div class="button-row" style="margin-top:9px"><button class="primary" data-coop="create">Создать комнату</button><button class="secondary" data-coop="matchmake">Найти жильцов</button></div><div class="card form-stack"><label>Код лифта<input id="coopCode" class="input" maxlength="6" placeholder="Например: VIII08"></label><button class="secondary" data-coop="join">Войти по коду</button></div><div class="card"><h3>Как это работает</h3><p>Действие одного меняет состояние комнаты у всех. Решение принимается голосованием. После обрыва соединения вы возвращаетесь в ту же вылазку.</p></div>`;$$('[data-coop]').forEach(b=>b.onclick=()=>coopCommand(b.dataset.coop));}
-function renderLobbyControls(c){const me=c.players.find(p=>String(p.userId)===String(state.base.profile.user_id))||{};return`<div class="button-row" style="margin-top:8px"><button class="secondary" data-coop="ready">${me.ready?'Снять готовность':'Я готов'}</button>${String(c.hostId)===String(state.base.profile.user_id)?'<button class="primary" data-coop="start">Закрыть двери</button>':''}<button class="danger" data-coop="leave">Выйти</button></div>`;}
-function renderCoopPlay(c,room){if(!room)return'<div class="empty">Комната проявляется…</div>';return`${cinematic({kicker:`ОБЩАЯ КОМНАТА ${c.roomIndex+1}`,title:room.title,text:room.description,number:String(c.roomIndex+8),shadow:c.shared.danger>35})}<div class="meter-grid"><div class="meter"><label>Нервы <b>${c.shared.nerve}</b></label><i style="--v:${c.shared.nerve}%"></i></div><div class="meter"><label>Опасность <b>${c.shared.danger}</b></label><i style="--v:${c.shared.danger}%"></i></div><div class="meter"><label>Улики <b>${c.shared.clues}</b></label><i style="--v:${Math.min(100,c.shared.clues*12)}%"></i></div></div><div class="action-wheel"><button class="secondary" data-coop-action="inspect">Осмотреть отдельно</button><button class="secondary" data-coop-action="help">Поддержать жильца</button><button class="secondary" data-coop-action="mark">Оставить метку</button><button class="secondary" data-coop-action="light">Включить свет</button></div>${section('Общее решение','Голос каждого видят все, но личную подсказку — только вы.')}<div class="vote-grid">${room.choices.map((choice,i)=>`<button class="choice-button ${Object.values(c.votes||{}).includes(i)?'voted':''}" data-coop-vote="${i}"><b>${esc(choice.label)}</b><small>${Object.values(c.votes||{}).filter(v=>v===i).length} голосов</small></button>`).join('')}</div>`;}
-function renderCoopEnd(c){view.innerHTML=`<div class="card" style="text-align:center;padding:34px"><span class="eyebrow">ГРУППОВАЯ ВЫЛАЗКА</span><h2 style="font-family:PT Serif">${c.phase==='escaped'?'Все вернулись к лифту':c.phase==='lost'?'Лифт закрылся':'Комната распущена'}</h2><p>${c.log?.at(-1)||''}</p><button class="primary" data-coop="reset">Вернуться в подъезд</button></div>`;$$('[data-coop]').forEach(b=>b.onclick=()=>coopCommand(b.dataset.coop));}
-function bindCoop(c){$$('[data-coop]').forEach(b=>b.onclick=()=>coopCommand(b.dataset.coop,c));$$('[data-coop-action]').forEach(b=>b.onclick=()=>coopAction(b.dataset.coopAction,c.id));$$('[data-coop-vote]').forEach(b=>b.onclick=()=>coopVote(Number(b.dataset.coopVote),c.id));}
-async function coopCommand(command,c=state.coop){try{connectCoop();if(command==='create')state.coop=await socketEmit('coop:create',{maxPlayers:4});if(command==='matchmake'){const r=await socketEmit('coop:matchmake',{});if(r.queued)toast(`Вы в очереди${r.position!=null?' · позиция '+(r.position+1):''}`);else state.coop=r.state;}if(command==='join')state.coop=await socketEmit('coop:join',{code:$('#coopCode')?.value?.trim().toUpperCase()});if(command==='ready')state.coop=await socketEmit('coop:ready',{matchId:c.id,ready:!c.players.find(p=>String(p.userId)===String(state.base.profile.user_id))?.ready});if(command==='start')state.coop=await socketEmit('coop:start',{matchId:c.id});if(command==='leave'){await socketEmit('coop:leave',{matchId:c.id});state.coop=null;}if(command==='reset'){state.coop=null;state.v2.activeCoop=null;}haptic('medium');renderCoop();}catch(e){toast(e.message);}}
-async function coopAction(action,matchId){try{state.coop=await socketEmit('coop:action',{matchId,action});effect(action==='light'?'elevator-bell':'room');haptic();renderCoop();}catch(e){toast(e.message);}}
-async function coopVote(choiceIndex,matchId){try{state.coop=await socketEmit('coop:vote',{matchId,choiceIndex});effect('paper',.5);renderCoop();}catch(e){toast(e.message);}}
-function startCoopTimer(){clearInterval(startCoopTimer.i);startCoopTimer.i=setInterval(()=>{const el=$('[data-deadline]');if(!el)return clearInterval(startCoopTimer.i);const sec=Math.max(0,Math.ceil((Number(el.dataset.deadline)-Date.now())/1000));el.textContent=formatTime(sec);},1000);}function formatTime(sec){if(sec==null)return'—';return`${String(Math.floor(sec/60)).padStart(2,'0')}:${String(sec%60).padStart(2,'0')}`;}
+class HouseAudioEngine {
+  constructor() {
+    this.context = null;
+    this.master = null;
+    this.ambienceBus = null;
+    this.effectsBus = null;
+    this.compressor = null;
+    this.buffers = new Map();
+    this.loading = new Map();
+    this.loops = new Map();
+    this.unlocked = false;
+    this.fallbackLoops = new Map();
+  }
 
-function renderBuilding(){const b=state.v2.building;view.innerHTML=`${section(b.building?.title||'Ваш подъезд','Постоянное сообщество до 30 реальных жильцов.')}<div class="building-hero"><div><span class="eyebrow">${esc(b.building?.code||'П-???')}</span><div class="building-code">${b.members.length} жильцов</div><p>Старший: ${esc(b.building?.elder_name||'ещё не выбран')} · доверие дома ${b.building?.trust_score||0}</p><div class="progress-track"><i style="width:${Math.min(100,Number(b.building?.shared_progress||0))}%"></i></div></div><button class="round-button" data-building="invite">+</button></div>${section('Доска объявлений','Записи видит только ваш подъезд.','<button class="secondary" data-building="post">Оставить запись</button>')}<div>${b.posts.length?b.posts.map(p=>`<article class="board-post"><small>${esc(p.author_name)} · ${fmtDate(p.created_at)}</small><p>${esc(p.body)}</p></article>`).join(''):'<div class="empty">На доске пока только следы от кнопок.</div>'}</div>${section('Жильцы','Доверие формируется поступками, его нельзя купить.')}<div class="card member-list">${b.members.map(m=>`<div class="member"><span class="resident-avatar">${esc(m.first_name?.[0]||'?')}</span><div><b>${esc(m.first_name)}</b><small>кв. ${m.apartment_no}${m.profession?' · '+roleName(m.profession):''}</small></div><div style="text-align:right"><i class="dot ${m.online?'online':''}"></i><small>${m.local_trust} доверия</small></div></div>`).join('')}</div>${section('Общий склад','Предметы можно оставить соседям или взять для общей цели.')}<div class="storage-grid">${b.storage.length?b.storage.map(x=>`<div class="storage-item"><div class="icon">□</div><b>${esc(itemName(x.item_id))}</b><p>На складе: ${x.quantity}</p><button class="tiny-button" data-storage="withdraw" data-item="${x.item_id}">Взять 1</button></div>`).join(''):'<div class="empty" style="grid-column:1/-1">Склад пуст.</div>'}</div><button class="secondary full" data-building="deposit" style="margin-top:8px">Положить предмет на склад</button>${section('Голосования','Решения меняют последствия для всего подъезда.')}<div>${b.votes.length?b.votes.map(renderVote).join(''):'<div class="empty">Открытых голосований нет.</div>'}</div>${section('Цель недели','Совместный прогресс сохраняется для подъезда.')}<div>${b.goals.map(g=>`<div class="card"><h3>${esc(g.title)}</h3><div class="progress-track"><i style="width:${Math.min(100,Number(g.progress)/Number(g.target)*100)}%"></i></div><p>${g.progress}/${g.target}</p></div>`).join('')}</div>`;bindBuilding();}
-function renderVote(v){const opts=Array.isArray(v.options)?v.options:[];return`<div class="card"><span class="eyebrow">${v.status==='open'?'ГОЛОСОВАНИЕ ОТКРЫТО':'РЕШЕНИЕ ПРИНЯТО'}</span><h3>${esc(v.title)}</h3><p>${esc(v.description)}</p><div class="button-row">${v.status==='open'?opts.map(o=>`<button class="secondary" data-vote="${v.id}" data-option="${esc(o.key)}">${esc(o.label)}</button>`).join(''):`<span class="pill">${esc(v.result?.winner||'без решения')}</span>`}</div></div>`;}
-function bindBuilding(){$$('[data-building]').forEach(b=>b.onclick=()=>buildingAction(b.dataset.building));$$('[data-storage]').forEach(b=>b.onclick=()=>storageAction(b.dataset.item,b.dataset.storage));$$('[data-vote]').forEach(b=>b.onclick=()=>castVote(b.dataset.vote,b.dataset.option));}
-async function buildingAction(action){if(action==='invite')return shareInvite();if(action==='post'){openSheet('Доска подъезда','Запись останется у всех жильцов',`<div class="form-stack"><textarea id="postBody" maxlength="500" placeholder="Что произошло в доме?"></textarea><button class="primary" id="postSend">Приколоть к доске</button></div>`);$('#postSend').onclick=async()=>{try{await api('/api/building/posts',{method:'POST',body:JSON.stringify({body:$('#postBody').value})});closeSheet();toast('Запись появилась на доске');await bootstrap();setTab('building');}catch(e){toast(e.message);}};}if(action==='deposit'){const items=state.base.inventory.filter(x=>x.quantity>0);openSheet('Общий склад','Выберите предмет',`<div class="inventory-grid">${items.map(x=>`<button class="inventory-item" data-deposit="${x.item_id}"><span class="icon">${x.icon||'□'}</span><b>${esc(x.name||x.item_id)}</b><em>×${x.quantity}</em></button>`).join('')}</div>`);$$('[data-deposit]',$('#sheetBody')).forEach(b=>b.onclick=()=>storageAction(b.dataset.deposit,'deposit'));}}
-async function storageAction(itemId,direction){try{await api('/api/building/storage',{method:'POST',body:JSON.stringify({itemId,quantity:1,direction,operationId:opId()})});closeSheet();toast(direction==='deposit'?'Предмет оставлен соседям':'Предмет забран со склада');await bootstrap();setTab('building');}catch(e){toast(e.message);}}
-async function castVote(id,optionKey){try{await api(`/api/building/votes/${id}`,{method:'POST',body:JSON.stringify({optionKey})});toast('Ваш голос записан');await bootstrap();setTab('building');}catch(e){toast(e.message);}}
-function shareInvite(){const link=state.base.referralLink,text='В нашем подъезде появилась дверь с твоим именем. Зайди в лифт.';if(tg?.openTelegramLink)tg.openTelegramLink(`https://t.me/share/url?url=${encodeURIComponent(link)}&text=${encodeURIComponent(text)}`);else navigator.clipboard.writeText(link).then(()=>toast('Ссылка скопирована'));}
+  async unlock() {
+    if (this.unlocked && this.context?.state === "running") return true;
+    try {
+      const AudioContextClass =
+        window.AudioContext || window.webkitAudioContext;
+      if (!AudioContextClass) return false;
+      if (!this.context) {
+        this.context = new AudioContextClass({ latencyHint: "interactive" });
+        this.master = this.context.createGain();
+        this.ambienceBus = this.context.createGain();
+        this.effectsBus = this.context.createGain();
+        this.compressor = this.context.createDynamicsCompressor();
+        this.compressor.threshold.value = -15;
+        this.compressor.knee.value = 18;
+        this.compressor.ratio.value = 5;
+        this.compressor.attack.value = 0.008;
+        this.compressor.release.value = 0.22;
+        this.ambienceBus.connect(this.master);
+        this.effectsBus.connect(this.compressor);
+        this.compressor.connect(this.master);
+        this.master.connect(this.context.destination);
+      }
+      await this.context.resume();
+      this.unlocked = true;
+      this.applyVolumes();
+      document.body.classList.add("sound-active");
+      return true;
+    } catch (error) {
+      console.warn("AudioContext unavailable", error);
+      return false;
+    }
+  }
 
-function renderArchive(){const tabs=[['apartment','Квартира'],['collections','Коллекции'],['roles','Профессия'],['stories','Личные дела']];view.innerHTML=`<div class="market-toolbar">${tabs.map(([id,label])=>`<button class="${state.archiveTab===id?'primary':'secondary'}" data-archive-tab="${id}">${label}</button>`).join('')}</div><div id="archiveBody"></div>`;$$('[data-archive-tab]').forEach(b=>b.onclick=()=>{state.archiveTab=b.dataset.archiveTab;renderArchive();});renderArchiveBody();}
-function renderArchiveBody(){const root=$('#archiveBody');if(state.archiveTab==='apartment')return renderApartment(root);if(state.archiveTab==='collections')return renderCollections(root);if(state.archiveTab==='roles')return renderRoles(root);renderStories(root);}
-function renderApartment(root){const placed=new Map(state.base.apartment.map(x=>[Number(x.slot),x]));root.innerHTML=`${section(`Квартира №${state.base.profile.apartment_no}`,'Предметы имеют историю владельцев и могут открывать сцены.')}<div class="apartment">${Array.from({length:12},(_,i)=>{const p=placed.get(i);return`<button class="apartment-slot" data-slot="${i}">${p?.icon||'·'}</button>`}).join('')}</div>${section('Вещи у двери','Выберите предмет и свободное место.')}<div class="inventory-grid">${state.base.inventory.length?state.base.inventory.map(x=>`<button class="inventory-item ${state.selectedItem===x.item_id?'selected':''}" data-item="${x.item_id}"><span class="icon">${x.icon||'□'}</span><b>${esc(x.name||x.item_id)}</b><p>${esc(x.description||'')}</p><em>×${x.quantity}</em></button>`).join(''):'<div class="empty">Пока пусто.</div>'}</div>`;$$('[data-item]',root).forEach(b=>b.onclick=()=>{state.selectedItem=b.dataset.item;renderApartment(root);toast('Теперь выберите место в комнате');});$$('[data-slot]',root).forEach(b=>b.onclick=()=>placeItem(Number(b.dataset.slot)));}
-async function placeItem(slot){if(!state.selectedItem)return toast('Сначала выберите предмет');try{await api('/api/apartment/place',{method:'POST',body:JSON.stringify({itemId:state.selectedItem,slot,rotation:0})});effect('place');state.selectedItem=null;await bootstrap();state.archiveTab='apartment';setTab('archive');}catch(e){toast(e.message);}}
-function renderCollections(root){const c=state.v2.collections;root.innerHTML=`${section('Коллекции дома','Завершение открывает комнату, историю или интерьер — не процент силы.')}<div class="collection-grid">${c.collections.map(x=>{const total=(x.entries||[]).reduce((sum,e)=>sum+Number(e.needed||0),0);const found=(x.entries||[]).reduce((sum,e)=>sum+Math.min(Number(e.owned||0),Number(e.needed||0)),0);return`<article class="collection-card ${x.complete?'complete':''}"><span class="eyebrow">${x.seasonal?'СЕЗОННАЯ':'АРХИВ'}</span><h3>${esc(x.title)}</h3><p>${esc(x.description)}</p><progress max="${Math.max(1,total)}" value="${found}"></progress><small>${found}/${total}</small>${x.complete&&!x.claimed?`<button class="tiny-button full" data-claim="${x.id}">Открыть награду</button>`:''}</article>`;}).join('')}</div>${section('Тихие достижения','Часть условий раскрывается только после выполнения.')}<div>${c.achievements.map(a=>`<div class="card"><h3 class="${a.hidden&&!a.unlocked_at?'achievement-secret':''}">${esc(a.unlocked_at?a.title:(a.hidden?'Запись скрыта':a.title))}</h3><p>${esc(a.unlocked_at?a.description:(a.hidden?'Дом ещё не разрешил прочитать условие.':a.description))}</p>${a.unlocked_at?'<span class="pill ok">найдено</span>':''}</div>`).join('')}</div>`;$$('[data-claim]',root).forEach(b=>b.onclick=()=>claimCollection(b.dataset.claim));}
-async function claimCollection(id){try{await api(`/api/collections/${id}/claim`,{method:'POST',body:'{}'});toast('Коллекция открыла новую часть дома');await bootstrap();state.archiveTab='collections';setTab('archive');}catch(e){toast(e.message);}}
-function roleName(key){return state.v2?.roles?.[key]?.title||({electrician:'Электрик',archivist:'Архивист',locksmith:'Слесарь',photographer:'Фотограф',courier:'Курьер',radio:'Радиолюбитель',chairman:'Председатель',observer:'Наблюдатель'}[key]||key);}
-function renderRoles(root){const current=state.v2.role?.role_key;root.innerHTML=`${section('Профессия жильца','Это не класс с цифрами: профессия меняет решения, инструменты и социальную пользу.')}<div class="role-grid">${Object.entries(state.v2.roles||{}).map(([key,r])=>`<article class="role-card ${current===key?'current':''}"><span class="eyebrow">${current===key?'ВАША РОЛЬ':'ДОСТУПНАЯ РОЛЬ'}</span><h3>${esc(r.title)}</h3><p>${esc(r.description)}</p><div class="button-row"><span class="pill">${esc(r.tool)}</span>${current!==key?`<button class="tiny-button" data-role="${key}">Выбрать</button>`:''}</div></article>`).join('')}</div>`;$$('[data-role]',root).forEach(b=>b.onclick=()=>chooseRole(b.dataset.role));}
-async function chooseRole(role){try{await api(`/api/roles/${role}`,{method:'POST',body:'{}'});toast(`Новая профессия: ${roleName(role)}`);await bootstrap();state.archiveTab='roles';setTab('archive');}catch(e){toast(e.message);}}
-function renderStories(root){root.innerHTML=`${section('Персональные сюжетные линии','Дом выдаёт истории по поступкам: ложь, помощь, звук, фотографии и брошенные соседи.')}<div>${state.v2.storylines.length?state.v2.storylines.map(x=>`<article class="card story-card"><span class="eyebrow">ГЛАВА ${Number(x.chapter)+1}</span><h3>${esc(x.title)}</h3><p>${esc(x.description)}</p><button class="secondary" data-story="${x.id}">Сделать выбор</button></article>`).join(''):'<div class="empty">Дом ещё собирает ваше личное дело.</div>'}</div>`;$$('[data-story]',root).forEach(b=>b.onclick=()=>storyChoice(b.dataset.story));}
+  applyVolumes() {
+    const now = this.context?.currentTime || 0;
+    const muted = state.audio.mute;
+    if (this.master) this.master.gain.setTargetAtTime(muted ? 0 : 1, now, 0.03);
+    if (this.ambienceBus)
+      this.ambienceBus.gain.setTargetAtTime(
+        state.audio.ambience / 100,
+        now,
+        0.06,
+      );
+    if (this.effectsBus)
+      this.effectsBus.gain.setTargetAtTime(
+        state.audio.effects / 100,
+        now,
+        0.03,
+      );
+    for (const audio of this.fallbackLoops.values()) {
+      audio.volume = muted
+        ? 0
+        : Math.min(
+            1,
+            (state.audio.ambience / 100) * Number(audio.dataset.volume || 1),
+          );
+    }
+  }
 
-async function loadMarket(){try{state.market=await api('/api/market');renderMarket();}catch(e){toast(e.message);}}
-function renderMarket(){const tabs=[['market','Лоты'],['sell','Продать'],['shop','Stars'],['purchases','Покупки']];view.innerHTML=`<div class="market-toolbar">${tabs.map(([id,label])=>`<button class="${state.marketTab===id?'primary':'secondary'}" data-market-tab="${id}">${label}</button>`).join('')}</div><div id="marketBody"></div>`;$$('[data-market-tab]').forEach(b=>b.onclick=async()=>{state.marketTab=b.dataset.marketTab;if(state.marketTab==='market'&&!state.market)await loadMarket();else renderMarket();});if(state.marketTab==='market')renderPlayerMarket();if(state.marketTab==='sell')renderSell();if(state.marketTab==='shop')renderStarsShop();if(state.marketTab==='purchases')renderPurchases();}
-function renderPlayerMarket(){const root=$('#marketBody');if(!state.market){root.innerHTML='<div class="loading-scene"><p>Считаем записи в книге обмена…</p></div>';return void loadMarket();}const m=state.market;root.innerHTML=`${section('Рынок жильцов',`Расчёт внутренними марками. Комиссия дома ${m.commissionPercent}%. Stars не выводятся и не обмениваются.`)}<div>${m.listings.length?m.listings.map(x=>`<article class="card listing"><div><span class="eyebrow">${x.anonymous?'АНОНИМНЫЙ ЛОТ':esc(x.seller_name||'Жилец')}</span><h3>${esc(itemName(x.item_id))}</h3><p>${x.remaining} шт. · до ${fmtDate(x.expires_at)}</p></div><div style="text-align:right"><div class="price">${x.price_per_unit} марок</div>${x.mine?'<span class="pill">ваш лот</span>':`<button class="tiny-button" data-buy-listing="${x.id}">Купить 1</button>`}</div></article>`).join(''):'<div class="empty">Активных лотов нет.</div>'}</div>${m.history.length?`<div class="card"><h3>История цен</h3><div class="history-line">${m.history.slice(0,30).reverse().map(x=>`<i style="height:${Math.max(5,Math.min(100,Number(x.avg_price)))}%" title="${x.avg_price}"></i>`).join('')}</div></div>`:''}`;$$('[data-buy-listing]',root).forEach(b=>b.onclick=()=>buyListing(b.dataset.buyListing));}
-async function buyListing(id){try{await api(`/api/market/listings/${id}/buy`,{method:'POST',body:JSON.stringify({quantity:1,operationId:opId()})});toast('Сделка записана в книгу владельцев');state.market=null;await bootstrap();state.marketTab='market';setTab('market');}catch(e){toast(e.message);}}
-function renderSell(){const items=state.base.inventory.filter(x=>x.quantity>0&&!x.item_id.startsWith('story_'));$('#marketBody').innerHTML=`${section('Выставить находку','Сюжетные предметы и билеты продавать нельзя.')}<form id="sellForm" class="card form-stack"><label>Предмет<select name="itemId">${items.map(x=>`<option value="${x.item_id}">${esc(x.name||x.item_id)} · ${x.quantity} шт.</option>`).join('')}</select></label><label>Количество<input type="number" name="quantity" min="1" max="100" value="1"></label><label>Цена за единицу, марки<input type="number" name="price" min="1" max="100000" value="10"></label><label class="switch-row"><span>Скрыть имя продавца</span><input type="checkbox" name="anonymous"></label><button class="primary">Опубликовать лот</button></form>`;$('#sellForm').onsubmit=async e=>{e.preventDefault();const f=new FormData(e.currentTarget);try{await api('/api/market/listings',{method:'POST',body:JSON.stringify({itemId:f.get('itemId'),quantity:Number(f.get('quantity')),price:Number(f.get('price')),anonymous:f.get('anonymous')==='on',operationId:opId()})});toast('Лот появился на рынке');state.market=null;state.marketTab='market';renderMarket();}catch(err){toast(err.message);}};}
-function renderStarsShop(){const products=state.base.shop||[];$('#marketBody').innerHTML=`${section('Сюжетные покупки','Полные главы, кооперативные ночи, интерьеры и подарки. Никакой покупки победы.')}<div class="shop-grid">${products.map(x=>`<article class="shop-item"><span class="eyebrow">${x.limited_until?`ДО ${fmtDate(x.limited_until)}`:'TELEGRAM STARS'}</span><div style="font-size:28px">${x.icon}</div><h3>${esc(x.title)}</h3><p>${esc(x.description)}</p>${x.full_contents?`<small>${esc(Array.isArray(x.full_contents)?x.full_contents.join(' · '):JSON.stringify(x.full_contents))}</small>`:''}<div class="button-row"><button class="tiny-button" data-buy="${x.sku}">★ ${x.stars}</button><button class="tiny-button secondary" data-gift="${x.sku}">Подарить</button></div></article>`).join('')}</div>`;$$('[data-buy]').forEach(b=>b.onclick=()=>buyStars(b.dataset.buy));$$('[data-gift]').forEach(b=>b.onclick=()=>giftProduct(b.dataset.gift));}
-async function buyStars(sku){try{const{invoiceLink,purchaseId}=await api(`/api/shop/${sku}/invoice`,{method:'POST',body:'{}'});if(!tg?.openInvoice)throw new Error('Счёт Stars открывается только внутри Telegram');tg.openInvoice(invoiceLink,status=>{if(status==='paid'){effect('purchase');toast('Оплата подтверждена. Проверяем выдачу…');pollPurchase(purchaseId);}else if(status==='cancelled')toast('Счёт закрыт');});}catch(e){toast(e.message);}}
-async function pollPurchase(id){for(let i=0;i<12;i++){await new Promise(r=>setTimeout(r,850));try{const p=await api(`/api/purchases/${id}/status`);if(p.status==='paid'){toast('Покупка выдана');await bootstrap();return;}}catch{}}toast('Платёж принят. История обновится позже.');}
-function giftProduct(sku){const members=state.v2.building.members.filter(x=>String(x.id)!==String(state.base.profile.user_id));openSheet('Подарок жильцу','Telegram Stars',`<div class="form-stack"><label>Получатель<select id="giftTarget">${members.map(m=>`<option value="${m.id}">${esc(m.first_name)} · кв. ${m.apartment_no}</option>`).join('')}</select></label><label>Подпись<textarea id="giftMessage" maxlength="160" placeholder="Оставьте короткую записку"></textarea></label><label class="switch-row"><span>Анонимно</span><input id="giftAnonymous" type="checkbox"></label><button class="primary" id="giftPay">Выставить счёт</button></div>`);$('#giftPay').onclick=async()=>{try{const r=await api(`/api/gifts/${sku}/invoice`,{method:'POST',body:JSON.stringify({targetId:Number($('#giftTarget').value),message:$('#giftMessage').value,anonymous:$('#giftAnonymous').checked})});tg.openInvoice(r.invoiceLink,status=>{if(status==='paid'){closeSheet();toast('Подарок отправлен');}});}catch(e){toast(e.message);}};}
-function renderPurchases(){const p=state.v2.purchases||[];$('#marketBody').innerHTML=`${section('История покупок','Статус, выдача, возврат и восстановление после сбоя.')}<div class="card">${p.length?p.map(x=>`<div class="purchase-row"><div><b>${esc(x.title||x.sku)}</b><small>${fmtDate(x.created_at)} · ${x.stars} ★</small></div><div style="text-align:right"><span class="pill ${x.status==='paid'?'ok':x.status==='refunded'?'bad':''}">${esc(x.status)}</span>${x.status==='paid'&&!x.revoked_at?`<button class="tiny-button" data-restore="${x.id}">Восстановить</button>`:''}</div></div>`).join(''):'<p>Покупок пока нет.</p>'}</div><button class="secondary full" data-more="support-payment">Проблема с оплатой</button>`;$$('[data-restore]').forEach(b=>b.onclick=()=>restorePurchase(b.dataset.restore));$('[data-more="support-payment"]')?.addEventListener('click',()=>{state.tab='more';state.moreTab='support';render();});}
-async function restorePurchase(id){try{await api(`/api/purchases/${id}/restore`,{method:'POST',body:'{}'});toast('Сервер повторно проверил выдачу');await bootstrap();state.marketTab='purchases';setTab('market');}catch(e){toast(e.message);}}
-function itemName(id){return state.base?.inventory?.find(x=>x.item_id===id)?.name||id.replaceAll('_',' ');}
+  async load(name, kind = "effect") {
+    const key = `${kind}:${name}`;
+    if (this.buffers.has(key)) return this.buffers.get(key);
+    if (this.loading.has(key)) return this.loading.get(key);
+    const extension = kind === "ambience" ? "ogg" : "wav";
+    const task = fetch(`/audio/${name}.${extension}`, { cache: "force-cache" })
+      .then((response) => {
+        if (!response.ok) throw new Error(`Audio ${name} ${response.status}`);
+        return response.arrayBuffer();
+      })
+      .then((data) => this.context.decodeAudioData(data))
+      .then((buffer) => {
+        this.buffers.set(key, buffer);
+        this.loading.delete(key);
+        return buffer;
+      })
+      .catch((error) => {
+        this.loading.delete(key);
+        console.warn("Audio asset failed", name, error);
+        return null;
+      });
+    this.loading.set(key, task);
+    return task;
+  }
 
-function renderMore(){const tabs=[['settings','Звук'],['support','Поддержка'],['notes','Записки'],['gifts','Подарки']];view.innerHTML=`<div class="market-toolbar">${tabs.map(([id,label])=>`<button class="${state.moreTab===id?'primary':'secondary'}" data-more-tab="${id}">${label}</button>`).join('')}</div><div id="moreBody"></div>`;$$('[data-more-tab]').forEach(b=>b.onclick=()=>{state.moreTab=b.dataset.moreTab;renderMore();});renderMoreBody();}
-function renderMoreBody(){if(state.moreTab==='settings')return renderSettings();if(state.moreTab==='support')return renderSupport();if(state.moreTab==='notes')return renderNotes();renderGifts();}
-function renderSettings(){$('#moreBody').innerHTML=`${section('Дом звучит слоями','Окружение и события регулируются отдельно.')}<div class="card form-stack"><label>Окружение <output>${state.audio.ambience}</output><input data-audio="ambience" type="range" min="0" max="100" value="${state.audio.ambience}"></label><label>События <output>${state.audio.effects}</output><input data-audio="effects" type="range" min="0" max="100" value="${state.audio.effects}"></label><label class="switch-row"><span>Вибрация</span><input data-audio="vibration" type="checkbox" ${state.audio.vibration?'checked':''}></label><label class="switch-row"><span>Полная тишина</span><input data-audio="mute" type="checkbox" ${state.audio.mute?'checked':''}></label><button class="secondary" id="audioTest">Проверить коридор</button></div><div class="card"><h3>Аккаунт</h3><p>Версия ${esc(state.v2.appVersion)} · сессия ${esc(state.sessionId.slice(0,8))}</p><button class="secondary" id="shareInvite">Пригласить знакомого</button></div>`;$$('[data-audio]').forEach(x=>x.oninput=()=>updateAudio(x.dataset.audio,x.type==='checkbox'?x.checked:Number(x.value)));$('#audioTest').onclick=()=>{startHouseAudio();effect('footsteps',.7)};$('#shareInvite').onclick=shareInvite;}
-function updateAudio(key,value){state.audio[key]=value;localStorage.setItem(`ef_${key}`,key==='mute'||key==='vibration'?(value?'1':'0'):String(value));if(key==='mute'&&value)stopLoops();else startHouseAudio();for(const a of Object.values(state.loops))a.volume=Math.min(1,state.audio.ambience/100*.45);renderSettings();}
-function renderSupport(){const s=state.v2.support;$('#moreBody').innerHTML=`${section('Служба дома','Telegram ID, версия, последняя вылазка и покупка прикладываются автоматически.','<button class="secondary" id="newTicket">Новое обращение</button>')}<div>${s.tickets.length?s.tickets.map(t=>`<article class="card"><span class="eyebrow">${esc(t.category)} · ${esc(t.status)}</span><h3>${esc(t.subject)}</h3><p>${fmtDate(t.updated_at)}</p>${s.messages.filter(m=>m.ticket_id===t.id).map(m=>`<div class="private-note"><b>${m.from_user?'Вы':m.admin_name||'Домоуправление'}</b><br>${esc(m.body)}</div>`).join('')}<button class="tiny-button" data-ticket-reply="${t.id}">Ответить</button></article>`).join(''):'<div class="empty">Обращений нет.</div>'}</div>`;$('#newTicket').onclick=openTicketForm;$$('[data-ticket-reply]').forEach(b=>b.onclick=()=>ticketReply(b.dataset.ticketReply));}
-function openTicketForm(){openSheet('Новое обращение','Служба дома',`<form id="ticketForm" class="form-stack"><label>Категория<select name="category"><option value="bug">Ошибка</option><option value="payment">Оплата</option><option value="account">Аккаунт</option><option value="moderation">Жалоба</option><option value="idea">Предложение</option><option value="other">Другое</option></select></label><label>Тема<input name="subject" minlength="3" maxlength="120" required></label><label>Сообщение<textarea name="body" minlength="3" maxlength="3000" required></textarea></label><label>Скриншот<input name="screenshot" type="file" accept="image/png,image/jpeg,image/webp"></label><button class="primary">Отправить</button></form>`);$('#ticketForm').onsubmit=async e=>{e.preventDefault();const f=new FormData(e.currentTarget),file=f.get('screenshot');let screenshot;if(file?.size)screenshot=await fileData(file);try{await api('/api/support',{method:'POST',body:JSON.stringify({category:f.get('category'),subject:f.get('subject'),body:f.get('body'),screenshot,appVersion:state.v2.appVersion,context:{tab:state.tab}})});closeSheet();toast('Обращение передано домоуправлению');await bootstrap();state.moreTab='support';setTab('more');}catch(err){toast(err.message);}};}
-function fileData(file){return new Promise((resolve,reject)=>{const r=new FileReader();r.onload=()=>resolve(r.result);r.onerror=reject;r.readAsDataURL(file);});}
-function ticketReply(id){openSheet('Ответить поддержке','Журнал обращения',`<div class="form-stack"><textarea id="replyBody" maxlength="3000"></textarea><button id="replySend" class="primary">Отправить</button></div>`);$('#replySend').onclick=async()=>{try{await api(`/api/support/${id}/messages`,{method:'POST',body:JSON.stringify({body:$('#replyBody').value})});closeSheet();toast('Ответ добавлен');await bootstrap();state.moreTab='support';setTab('more');}catch(e){toast(e.message);}};}
-function renderNotes(){const notes=state.base.notes||[];$('#moreBody').innerHTML=`${section('Записки у двери','Нежелательное сообщение можно отправить на проверку.')}<div>${notes.length?notes.map(n=>`<article class="board-post"><small>${esc(n.author_name||'Неизвестный жилец')} · ${fmtDate(n.created_at)}</small><p>${esc(n.body)}</p><button class="tiny-button" data-report-note="${n.id}" data-author="${n.author_id}">Пожаловаться</button></article>`).join(''):'<div class="empty">Под дверью ничего нет.</div>'}</div>${section('Оставить соседу','Записка будет доставлена асинхронно.')}<div class="card form-stack"><select id="noteTarget">${state.v2.building.members.filter(m=>String(m.id)!==String(state.base.profile.user_id)).map(m=>`<option value="${m.id}">${esc(m.first_name)} · кв. ${m.apartment_no}</option>`).join('')}</select><textarea id="noteBody" maxlength="280"></textarea><button id="noteSend" class="primary">Оставить у двери</button></div>`;$('#noteSend').onclick=sendNote;$$('[data-report-note]').forEach(b=>b.onclick=()=>reportEntity(b.dataset.author,'note',b.dataset.reportNote));}
-async function sendNote(){try{await api('/api/social/note',{method:'POST',body:JSON.stringify({targetId:$('#noteTarget').value,body:$('#noteBody').value,mood:'strange'})});effect('paper');toast('Записка оставлена');await bootstrap();state.moreTab='notes';setTab('more');}catch(e){toast(e.message);}}
-function reportEntity(targetId,entityType,entityId){openSheet('Жалоба','Модерация подъезда',`<div class="form-stack"><select id="reportReason"><option value="spam">Спам</option><option value="abuse">Оскорбление</option><option value="fraud">Мошенничество</option><option value="other">Другое</option></select><textarea id="reportDetails" maxlength="1000"></textarea><button id="reportSend" class="danger">Отправить на проверку</button></div>`);$('#reportSend').onclick=async()=>{try{await api('/api/reports',{method:'POST',body:JSON.stringify({targetId:String(targetId),entityType,entityId,reason:$('#reportReason').value,details:$('#reportDetails').value})});closeSheet();toast('Жалоба зарегистрирована');}catch(e){toast(e.message);}};}
-function renderGifts(){const gifts=state.v2.gifts||[];$('#moreBody').innerHTML=`${section('Подарки у двери','Билеты, интерьеры и кассеты от реальных жильцов.')}<div>${gifts.length?gifts.map(g=>`<article class="card"><span class="eyebrow">${g.anonymous?'АНОНИМНЫЙ ПОДАРОК':esc(g.sender_name||'Жилец')}</span><h3>${esc(g.title||g.sku)}</h3><p>${esc(g.message||'Без записки')}</p><span class="pill ${g.status==='delivered'?'warn':'ok'}">${esc(g.status)}</span>${g.status==='delivered'?`<button class="tiny-button" data-claim-gift="${g.id}">Принять</button>`:''}</article>`).join(''):'<div class="empty">Подарков пока нет.</div>'}</div>`;$$('[data-claim-gift]').forEach(b=>b.onclick=()=>claimGift(b.dataset.claimGift));}
-async function claimGift(id){try{await api(`/api/gifts/${id}/claim`,{method:'POST',body:'{}'});toast('Подарок принят');await bootstrap();state.moreTab='gifts';setTab('more');}catch(e){toast(e.message);}}
+  async play(name, { volume = 1, pan = 0, rate = 1, kind = "effect" } = {}) {
+    if (state.audio.mute) return;
+    const ready = await this.unlock();
+    if (!ready || !this.context)
+      return this.playFallback(name, { volume, kind });
+    const buffer = await this.load(name, kind);
+    if (!buffer) return this.playFallback(name, { volume, kind });
+    const source = this.context.createBufferSource();
+    const gain = this.context.createGain();
+    const panner = this.context.createStereoPanner?.();
+    source.buffer = buffer;
+    source.playbackRate.value = rate;
+    gain.gain.value = Math.max(0, Math.min(1.4, volume));
+    source.connect(gain);
+    if (panner) {
+      panner.pan.value = Math.max(-1, Math.min(1, pan));
+      gain.connect(panner);
+      panner.connect(kind === "ambience" ? this.ambienceBus : this.effectsBus);
+    } else {
+      gain.connect(kind === "ambience" ? this.ambienceBus : this.effectsBus);
+    }
+    source.start();
+    return source;
+  }
 
-function renderTutorial(){const t=state.v2.tutorial,step=Number(t.step),current=t.current;if(!current)return $('#tutorialOverlay').classList.add('hidden');const overlay=$('#tutorialOverlay');overlay.classList.remove('hidden');const visual=tutorialVisual(current.action);overlay.innerHTML=`<div class="tutorial-frame ${current.action!=='open_door'?'open':''}" data-tutorial-frame><div class="tutorial-visual">${visual}</div><div class="tutorial-copy"><div class="tutorial-progress">${t.steps.map((_,i)=>`<i class="${i<=step?'done':''}"></i>`).join('')}</div><span class="eyebrow">ПЕРВАЯ НОЧЬ · ${step+1}/${t.total}</span><h1>${esc(current.title)}</h1><p>${esc(current.text)}</p><button class="primary full" id="tutorialAction" ${current.action==='inspect_room'?'disabled':''}>${esc(current.cta)}</button></div></div>`;bindTutorial(current.action);}
-function tutorialVisual(action){if(action==='open_door')return'<div class="tutorial-door-left"></div><div class="tutorial-door-right"></div><div class="bulb"></div>';if(action==='inspect_room')return`${cinematic({title:'Коридор уже знает ваше имя',text:'Найдите три детали.',shadow:true})}<button class="inspect-point" style="left:20%;top:32%" data-inspect="1"></button><button class="inspect-point" style="right:21%;top:48%" data-inspect="2"></button><button class="inspect-point" style="left:48%;top:20%" data-inspect="3"></button>`;if(action==='take_item')return'<div class="tutorial-object">▣</div><div class="lamp-cone"></div>';if(action==='make_choice')return`${cinematic({title:'Тук · тук-тук',text:'За дверью дышат в вашем ритме.',number:'?',shadow:true})}`;if(action==='lose_nerve')return'<div class="tutorial-object" style="font-size:90px">◉</div><div class="shadow-person" style="right:42%;top:25%"></div>';if(action==='return_home')return'<div class="tutorial-door-left" style="transform:translateX(-70%)"></div><div class="tutorial-door-right" style="transform:translateX(70%)"></div><div class="coop-code" style="padding-top:30px">00:08</div>';if(action==='place_item')return'<div class="tutorial-object">▣</div><div class="apartment" style="position:absolute;inset:12% 8% 4%;height:auto"><button class="apartment-slot">·</button></div>';if(action==='read_note')return'<div class="tutorial-note">Не отвечай консьержу.<br>Его не существует.<br><br>— квартира 8</div>';return'<div class="hall-door" data-number="ТВОЙ ДРУГ" style="bottom:20%;width:145px"></div><div class="lamp-cone"></div>';}
-function bindTutorial(action){if(action==='inspect_room'){$$('[data-inspect]').forEach(p=>p.onclick=()=>{p.classList.add('done');state.tutorialInspect.add(p.dataset.inspect);effect('camera',.45);if(state.tutorialInspect.size>=3)$('#tutorialAction').disabled=false;});}$('#tutorialAction').onclick=async()=>{try{if(action==='open_door'){$('[data-tutorial-frame]').classList.add('open');effect('elevator');await new Promise(r=>setTimeout(r,900));}if(action==='take_item')effect('paper');if(action==='make_choice')effect('door');if(action==='lose_nerve'){effect('impact');haptic('heavy');}if(action==='return_home')effect('elevator');if(action==='place_item')effect('place');if(action==='read_note')effect('paper');const result=await api('/api/tutorial/action',{method:'POST',body:JSON.stringify({action})});state.v2.tutorial={...state.v2.tutorial,...result};state.tutorialInspect.clear();if(result.completed){$('#tutorialOverlay').classList.add('hidden');toast('Вы заселены. Дом уже знает ваше имя.');await bootstrap();}else{state.v2.tutorial.current=result.current;renderTutorial();}}catch(e){toast(e.message);}};}
+  playFallback(name, { volume = 1, kind = "effect" } = {}) {
+    const extension = kind === "ambience" ? "ogg" : "wav";
+    const audio = new Audio(`/audio/${name}.${extension}`);
+    const bus =
+      kind === "ambience" ? state.audio.ambience : state.audio.effects;
+    audio.volume = state.audio.mute ? 0 : Math.min(1, (bus / 100) * volume);
+    audio.play().catch(() => {});
+    return audio;
+  }
 
-function openSheet(title,kicker,html){$('#sheetTitle').textContent=title;$('#sheetKicker').textContent=kicker;$('#sheetBody').innerHTML=html;$('#sheet').showModal();}function closeSheet(){if($('#sheet').open)$('#sheet').close();}
-$('#sheetClose').onclick=closeSheet;$('#dailyRibbon').onclick=()=>{state.tab='home';render();document.querySelector('.daily-scene')?.scrollIntoView({behavior:'smooth'});};
-$('#bottomNav').onclick=e=>{const b=e.target.closest('[data-tab]');if(b)setTab(b.dataset.tab);};
-$('#soundButton').onclick=()=>{$('#soundPanel').classList.toggle('hidden');startHouseAudio();};$('#soundClose').onclick=()=>$('#soundPanel').classList.add('hidden');
-$('#ambienceVolume').value=state.audio.ambience;$('#effectsVolume').value=state.audio.effects;$('#muteToggle').checked=state.audio.mute;$('#vibrationToggle').checked=state.audio.vibration;$('#ambienceValue').textContent=state.audio.ambience;$('#effectsValue').textContent=state.audio.effects;
-$('#ambienceVolume').oninput=e=>{$('#ambienceValue').textContent=e.target.value;updateAudio('ambience',Number(e.target.value));};$('#effectsVolume').oninput=e=>{$('#effectsValue').textContent=e.target.value;updateAudio('effects',Number(e.target.value));};$('#muteToggle').onchange=e=>updateAudio('mute',e.target.checked);$('#vibrationToggle').onchange=e=>updateAudio('vibration',e.target.checked);
-document.addEventListener('pointerdown',()=>startHouseAudio(),{once:true});
-setInterval(()=>{const d=new Date();$('#buildingClock').textContent=`${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')} · дом не спит`;},1000);
-window.addEventListener('beforeunload',()=>{navigator.sendBeacon?.(`/api/sessions/${state.sessionId}/end`);});window.addEventListener('error',e=>track('client_error',{message:e.message,source:e.filename,line:e.lineno}));window.addEventListener('unhandledrejection',e=>track('client_error',{message:String(e.reason)}));
+  async ensureLoop(name, volume = 1) {
+    if (state.audio.mute || state.audio.ambience === 0) return;
+    const ready = await this.unlock();
+    if (!ready || !this.context) {
+      if (!this.fallbackLoops.has(name)) {
+        const audio = new Audio(`/audio/${name}.ogg`);
+        audio.loop = true;
+        audio.dataset.volume = String(volume);
+        this.fallbackLoops.set(name, audio);
+        audio.play().catch(() => {});
+      }
+      this.applyVolumes();
+      return;
+    }
+    if (this.loops.has(name)) {
+      const entry = this.loops.get(name);
+      entry.targetVolume = volume;
+      entry.gain.gain.setTargetAtTime(volume, this.context.currentTime, 0.6);
+      return;
+    }
+    const buffer = await this.load(name, "ambience");
+    if (!buffer || this.loops.has(name)) return;
+    const source = this.context.createBufferSource();
+    const gain = this.context.createGain();
+    source.buffer = buffer;
+    source.loop = true;
+    gain.gain.value = 0;
+    source.connect(gain);
+    gain.connect(this.ambienceBus);
+    source.start();
+    gain.gain.setTargetAtTime(volume, this.context.currentTime, 0.7);
+    this.loops.set(name, { source, gain, targetVolume: volume });
+  }
+
+  fadeLoop(name, stop = true) {
+    const entry = this.loops.get(name);
+    if (entry && this.context) {
+      entry.gain.gain.setTargetAtTime(0, this.context.currentTime, 0.45);
+      if (stop)
+        setTimeout(() => {
+          try {
+            entry.source.stop();
+          } catch {}
+          this.loops.delete(name);
+        }, 1300);
+    }
+    const fallback = this.fallbackLoops.get(name);
+    if (fallback) {
+      fallback.pause();
+      fallback.currentTime = 0;
+      this.fallbackLoops.delete(name);
+    }
+  }
+
+  setScene(tab) {
+    const scenes = {
+      home: { "rain-window": 0.5, "lamp-hum": 0.21 },
+      coop: { "rain-window": 0.25, "floor-ambience": 0.46 },
+      building: { "rain-window": 0.34, neighbor: 0.13 },
+      archive: { "lamp-hum": 0.2, television: 0.09 },
+      market: { "rain-window": 0.25, "floor-ambience": 0.13 },
+      more: { "rain-window": 0.31, wind: 0.1 },
+    };
+    const desired = scenes[tab] || scenes.home;
+    for (const name of new Set([
+      ...this.loops.keys(),
+      ...this.fallbackLoops.keys(),
+    ])) {
+      if (!(name in desired)) this.fadeLoop(name);
+    }
+    for (const [name, volume] of Object.entries(desired))
+      void this.ensureLoop(name, volume);
+  }
+
+  stopAll() {
+    for (const name of [...this.loops.keys(), ...this.fallbackLoops.keys()])
+      this.fadeLoop(name);
+  }
+
+  async testSpace() {
+    await this.unlock();
+    await this.play("elevator-bell", {
+      kind: "ambience",
+      volume: 0.45,
+      pan: -0.85,
+    });
+    await wait(480);
+    await this.play("footsteps", {
+      kind: "ambience",
+      volume: 0.34,
+      pan: 0.82,
+      rate: 1.08,
+    });
+  }
+}
+
+const audioEngine = new HouseAudioEngine();
+
+const state = {
+  base: null,
+  v2: null,
+  tab: "home",
+  previousTab: "home",
+  archiveTab: "apartment",
+  marketTab: "market",
+  moreTab: "settings",
+  expedition: null,
+  selectedItem: null,
+  coop: null,
+  socket: null,
+  sessionId: sessionStorage.getItem("ef_session") || opId(),
+  assignments: {},
+  audio: {
+    ambience: Number(localStorage.getItem("ef_ambience") ?? 58),
+    effects: Number(localStorage.getItem("ef_effects") ?? 74),
+    mute: localStorage.getItem("ef_mute") === "1",
+    vibration: localStorage.getItem("ef_vibration") !== "0",
+  },
+  motionReduced: reduceMotion,
+  ambientTimer: null,
+  tutorialInspect: new Set(),
+  dailyOpen: false,
+  bootComplete: false,
+  lastFloor: 7,
+  installPrompt: null,
+  listening: false,
+  listenHint: null,
+};
+
+sessionStorage.setItem("ef_session", state.sessionId);
+const view = $("#view");
+const toastEl = $("#toast");
+const bootScene = $("#bootScene");
+const bootStatus = $("#bootStatus");
+const bootFloor = $("#bootFloor");
+const networkBanner = $("#networkBanner");
+let bootCounter = 7;
+const bootTimer = setInterval(() => {
+  if (!bootFloor || state.bootComplete) return;
+  bootCounter = bootCounter === 7 ? 9 : bootCounter === 9 ? 8 : 7;
+  bootFloor.textContent = String(bootCounter);
+}, 620);
+
+function finishBoot(message = "Двери открываются") {
+  if (state.bootComplete) return;
+  state.bootComplete = true;
+  clearInterval(bootTimer);
+  if (bootStatus) bootStatus.textContent = message;
+  if (bootFloor) bootFloor.textContent = "8";
+  setTimeout(() => bootScene?.classList.add("open"), 170);
+  setTimeout(
+    () => bootScene?.classList.add("done"),
+    state.motionReduced ? 220 : 1150,
+  );
+}
+
+function setNetworkState(online) {
+  document.body.classList.toggle("network-offline", !online);
+  networkBanner?.classList.toggle("hidden", online);
+  if (online && state.base) void bootstrap({ preserveTab: true, quiet: true });
+}
+window.addEventListener("online", () => setNetworkState(true));
+window.addEventListener("offline", () => setNetworkState(false));
+setNetworkState(navigator.onLine);
+
+async function api(path, options = {}) {
+  const method = options.method || "GET";
+  const idempotencyKey =
+    options.headers?.["x-idempotency-key"] ||
+    (options.body !== undefined && method !== "GET" ? opId() : undefined);
+  const attempts = method === "GET" ? 3 : 2;
+  let lastError;
+  for (let attempt = 0; attempt < attempts; attempt += 1) {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 18000);
+    const headers = {
+      "x-telegram-init-data": resolveTelegramInitData(),
+      "x-dev-user-id": devUser,
+      "x-client-version": APP_VERSION,
+      ...options.headers,
+    };
+    if (options.body !== undefined) {
+      headers["content-type"] = "application/json";
+      if (idempotencyKey) headers["x-idempotency-key"] = idempotencyKey;
+    }
+    try {
+      const response = await fetch(path, {
+        ...options,
+        method,
+        headers,
+        signal: options.signal || controller.signal,
+        cache: method === "GET" ? "no-store" : options.cache,
+      });
+      clearTimeout(timeout);
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        const error = new Error(
+          payload.error || payload.message || `Ошибка ${response.status}`,
+        );
+        error.code = payload.code;
+        error.status = response.status;
+        throw error;
+      }
+      return payload;
+    } catch (error) {
+      clearTimeout(timeout);
+      lastError = error;
+      const retryable =
+        error.name === "AbortError" ||
+        error instanceof TypeError ||
+        [408, 425, 429, 502, 503, 504].includes(error.status);
+      if (!retryable || attempt === attempts - 1) break;
+      await wait(300 * 2 ** attempt + Math.random() * 180);
+    }
+  }
+  throw lastError;
+}
+
+function toast(text, tone = "neutral") {
+  toastEl.textContent = text;
+  toastEl.dataset.tone = tone;
+  toastEl.classList.add("show");
+  clearTimeout(toastEl._t);
+  toastEl._t = setTimeout(() => toastEl.classList.remove("show"), 3000);
+}
+function haptic(type = "light") {
+  if (!state.audio.vibration) return;
+  if (type === "success" || type === "warning" || type === "error")
+    tg?.HapticFeedback?.notificationOccurred?.(type);
+  else tg?.HapticFeedback?.impactOccurred?.(type);
+}
+function effect(name, volume = 1, pan = 0) {
+  return audioEngine.play(name, { volume, pan, kind: "effect" });
+}
+function ambient(name, volume = 1, pan = Math.random() * 1.6 - 0.8) {
+  return audioEngine.play(name, { volume, pan, kind: "ambience" });
+}
+function loop(name, volume = 1) {
+  return audioEngine.ensureLoop(name, volume);
+}
+function stopLoops() {
+  audioEngine.stopAll();
+}
+function scheduleAmbient() {
+  clearTimeout(state.ambientTimer);
+  if (state.audio.mute || state.audio.ambience === 0 || document.hidden) return;
+  const pools = {
+    home: ["pipes", "neighbor", "television", "wind", "elevator-bell"],
+    coop: ["footsteps", "whisper", "pipes", "intercom"],
+    building: ["neighbor", "television", "intercom", "pipes"],
+    archive: ["camera", "wind", "television"],
+    market: ["footsteps", "neighbor", "elevator-bell"],
+    more: ["pipes", "wind", "intercom"],
+  };
+  const sounds = pools[state.tab] || pools.home;
+  state.ambientTimer = setTimeout(
+    () => {
+      void ambient(
+        sounds[Math.floor(Math.random() * sounds.length)],
+        0.12 + Math.random() * 0.2,
+      );
+      scheduleAmbient();
+    },
+    10000 + Math.random() * 22000,
+  );
+}
+function startHouseAudio() {
+  if (state.audio.mute) return;
+  void audioEngine.unlock().then(() => audioEngine.setScene(state.tab));
+  scheduleAmbient();
+}
+function track(eventName, properties = {}) {
+  api("/api/analytics", {
+    method: "POST",
+    body: JSON.stringify({
+      eventName,
+      properties,
+      sessionId: state.sessionId,
+      appVersion: state.v2?.appVersion || APP_VERSION,
+      assignments: state.assignments,
+    }),
+  }).catch(() => {});
+}
+
+async function playFloorTransition({
+  floor = 8,
+  label = "Лифт движется",
+  open = true,
+} = {}) {
+  const overlay = $("#floorTransition");
+  if (!overlay || state.motionReduced) {
+    state.lastFloor = Number(floor) || state.lastFloor;
+    await effect("elevator", 0.72);
+    return;
+  }
+  const floorEl = $("#transitionFloor");
+  const labelEl = $("#transitionLabel");
+  overlay.classList.remove("hidden", "open", "leaving");
+  overlay.setAttribute("aria-hidden", "false");
+  labelEl.textContent = label;
+  const target = Number(floor) || 8;
+  const sequence = [state.lastFloor || 7, 6, 7, 9, target];
+  void effect("elevator", 0.84);
+  haptic("medium");
+  for (const value of sequence) {
+    floorEl.textContent = String(value);
+    await wait(150);
+  }
+  floorEl.textContent = String(target);
+  state.lastFloor = target;
+  await wait(280);
+  if (open) {
+    overlay.classList.add("open");
+    void ambient("elevator-bell", 0.4, 0);
+    haptic("success");
+    await wait(760);
+  }
+  overlay.classList.add("leaving");
+  await wait(330);
+  overlay.classList.add("hidden");
+  overlay.classList.remove("open", "leaving");
+  overlay.setAttribute("aria-hidden", "true");
+}
+
+function animateValue(element, nextValue) {
+  if (!element) return;
+  const previous = Number(element.textContent);
+  const next = Number(nextValue);
+  if (
+    !Number.isFinite(previous) ||
+    !Number.isFinite(next) ||
+    state.motionReduced
+  ) {
+    element.textContent = String(nextValue);
+    return;
+  }
+  if (previous === next) return;
+  const started = performance.now();
+  const duration = 420;
+  const tick = (now) => {
+    const progress = Math.min(1, (now - started) / duration);
+    const eased = 1 - (1 - progress) ** 3;
+    element.textContent = String(
+      Math.round(previous + (next - previous) * eased),
+    );
+    if (progress < 1) requestAnimationFrame(tick);
+  };
+  requestAnimationFrame(tick);
+  element.closest("div")?.classList.add("stat-flash");
+  setTimeout(() => element.closest("div")?.classList.remove("stat-flash"), 760);
+}
+
+function updateTelegramNavigation() {
+  const nested = state.tab !== "home" || $("#sheet")?.open;
+  if (nested) tg?.BackButton?.show?.();
+  else tg?.BackButton?.hide?.();
+}
+
+function handleTelegramBack() {
+  if ($("#sheet")?.open) return closeSheet();
+  if (!$("#soundPanel")?.classList.contains("hidden"))
+    return $("#soundPanel").classList.add("hidden");
+  if (state.tab !== "home") return setTab("home");
+}
+tg?.BackButton?.onClick?.(handleTelegramBack);
+tg?.SettingsButton?.show?.();
+tg?.SettingsButton?.onClick?.(() =>
+  $("#soundPanel")?.classList.remove("hidden"),
+);
+
+async function bootstrap({ preserveTab = true, quiet = false } = {}) {
+  try {
+    if (!quiet && bootStatus)
+      bootStatus.textContent = "Telegram подтверждает квартиру…";
+    await waitForTelegramInitData();
+    const [base, v2] = await Promise.all([
+      api("/api/bootstrap"),
+      api("/api/v2/bootstrap"),
+    ]);
+    state.base = base;
+    state.v2 = v2;
+    state.expedition = base.activeExpedition;
+    state.assignments = Object.fromEntries(
+      Object.entries(v2.experiments || {}).map(([key, value]) => [
+        key,
+        value?.variant || String(value),
+      ]),
+    );
+    renderStatus();
+    renderDailyRibbon();
+    if (v2.activeCoop) connectCoop(v2.activeCoop);
+    if (!v2.tutorial.completed_at) renderTutorial();
+    else $("#tutorialOverlay").classList.add("hidden");
+    render();
+    updateTelegramNavigation();
+    finishBoot("Дом узнал вас");
+    if (!quiet) {
+      track("app_open", { tab: state.tab, platform: tg?.platform || "web" });
+      setTimeout(() => {
+        void audioEngine.load("door", "effect");
+        void audioEngine.load("room", "effect");
+        void audioEngine.load("rain-window", "ambience");
+      }, 300);
+    }
+  } catch (error) {
+    finishBoot("Двери не открылись");
+    renderLaunchError(error);
+  }
+}
+async function renderLaunchError(error) {
+  const diagnostic = telegramDiagnostics();
+  let botUsername = "";
+  try {
+    botUsername =
+      (
+        await fetch("/api/public-config", { cache: "no-store" }).then((r) =>
+          r.json(),
+        )
+      ).botUsername || "";
+  } catch {}
+  const noInitData =
+    !diagnostic.initDataLength || error.code === "TELEGRAM_AUTH_REQUIRED";
+  const invalidInitData =
+    error.code === "TELEGRAM_AUTH_INVALID" ||
+    error.code === "TELEGRAM_AUTH_EXPIRED";
+  const explanation = noInitData
+    ? `<p>Telegram открыл страницу без подписанного запуска. Закройте окно и войдите новой кнопкой <b>«Открыть двери лифта»</b> в личном чате с ботом.</p>`
+    : invalidInitData
+      ? `<p>Данные запуска получены, но подпись отклонена. Проверьте, что <code>BOT_TOKEN</code> в Railway принадлежит именно этому боту, затем отправьте боту <code>/start</code> ещё раз.</p>`
+      : `<p>Дом не смог завершить загрузку. Проверьте соединение и повторите запрос.</p>`;
+  view.innerHTML = `<div class="card launch-error"><div class="app-badge">${icon("warning")} ДИАГНОСТИКА ВХОДА</div><h3>Двери не открылись</h3><p>${esc(error.message)}</p>${explanation}<div class="button-row"><button class="primary" id="authRetry">${icon("elevator", "button-icon")}Проверить ещё раз</button>${botUsername ? `<button class="secondary" id="authReopen">${icon("send", "button-icon")}Открыть через бота</button>` : ""}</div><details><summary>Техническая информация</summary><pre>${esc(JSON.stringify({ ...diagnostic, serverCode: error.code || null, httpStatus: error.status || null }, null, 2))}</pre></details></div>`;
+  $("#authRetry").onclick = async () => {
+    sessionStorage.removeItem("ef_tg_init_data");
+    telegramInitData = "";
+    location.reload();
+  };
+  if (botUsername)
+    $("#authReopen").onclick = () => {
+      const link = `https://t.me/${botUsername.replace(/^@/, "")}?start=app`;
+      if (tg?.openTelegramLink) tg.openTelegramLink(link);
+      else location.href = link;
+    };
+}
+function renderStatus() {
+  const profile = state.base.profile;
+  $("#apartmentNo").textContent = profile.apartment_no;
+  animateValue($("#nerve"), profile.nerve);
+  animateValue($("#trust"), profile.trust);
+  animateValue($("#clues"), profile.clues);
+  animateValue($("#marks"), profile.house_marks ?? 0);
+}
+function renderDailyRibbon() {
+  const d = state.v2.daily?.scenario,
+    r = $("#dailyRibbon");
+  if (!d) {
+    r.classList.add("hidden");
+    return;
+  }
+  r.classList.remove("hidden");
+  r.innerHTML = `<b>${esc(d.title)}</b><small>${state.v2.daily.progress?.completed_at ? "История завершена сегодня" : "Сегодня · " + esc(d.teaser)}</small>`;
+}
+async function setTab(tab) {
+  if (!tab || tab === state.tab) return;
+  state.previousTab = state.tab;
+  state.tab = tab;
+  $$("#bottomNav button").forEach((button) =>
+    button.classList.toggle("active", button.dataset.tab === tab),
+  );
+  haptic();
+  view.classList.add("view-exit");
+  await wait(state.motionReduced ? 1 : 150);
+  startHouseAudio();
+  render();
+  view.classList.remove("view-exit");
+  view.classList.add("view-enter");
+  setTimeout(() => view.classList.remove("view-enter"), 390);
+  updateTelegramNavigation();
+  track("tab_open", { tab, from: state.previousTab });
+}
+function render() {
+  if (!state.base || !state.v2) return;
+  const map = {
+    home: renderHome,
+    coop: renderCoop,
+    building: renderBuilding,
+    archive: renderArchive,
+    market: renderMarket,
+    more: renderMore,
+  };
+  map[state.tab]?.();
+}
+function section(title, text, action = "") {
+  return `<div class="section-head"><div><h2>${esc(title)}</h2>${text ? `<p>${esc(text)}</p>` : ""}</div>${action}</div>`;
+}
+function cinematic({
+  kicker = "00:08",
+  title = "Этажа нет на плане",
+  text = "За дверью кто-то ждёт, пока вы первым назовёте своё имя.",
+  number = "8",
+  shadow = true,
+  tools = true,
+  ambience = "corridor",
+} = {}) {
+  return `<div class="cinematic ambience-${esc(ambience)}" data-parallax>
+    <div class="lamp-cone"></div><div class="bulb"></div><div class="corridor-floor"></div>
+    <div class="hall-door" data-number="${esc(number)}"></div>
+    ${shadow ? '<div class="shadow-person"></div>' : ""}
+    <div class="scene-noise"></div>
+    ${tools ? `<div class="scene-tools"><button class="scene-tool" data-scene-listen aria-label="Прислушаться">${icon("sound")}</button><button class="scene-tool" data-scene-look aria-label="Осмотреть">${icon("eye")}</button></div>` : ""}
+    <div class="listen-overlay"><div class="listen-radar"><i class="listen-sweep"></i><div class="listen-wave">${Array.from({ length: 19 }, (_, i) => `<i style="--i:${i}"></i>`).join("")}</div></div><p class="listen-copy">У стены слышно больше, чем написано в деле.</p></div>
+    <div class="scene-caption"><span class="eyebrow">${esc(kicker)}</span><h2>${esc(title)}</h2><p>${esc(text)}</p></div>
+  </div>`;
+}
+function renderHome() {
+  const e = state.base.event,
+    d = state.v2.daily;
+  if (state.expedition?.status === "active") return renderSoloExpedition();
+  view.innerHTML = `${e ? `<div class="card daily-scene"><span class="eyebrow">ОБЩЕДОМОВОЕ ПРОИСШЕСТВИЕ</span><h3>${esc(e.title)}</h3><p>${esc(e.body)}</p></div>` : ""}${cinematic({ kicker: "ЛИФТ · МЕЖДУ 7 И 9", title: "Восьмой этаж снова существует", text: "Один путь — тихий. Второй — короткий. Оба заканчиваются у одной двери." })}<div class="button-row" style="margin-top:9px"><button class="primary" data-action="solo-start">Войти одному</button><button class="secondary" data-action="coop-open">Позвать жильцов</button></div>${d?.scenario ? renderDailyCard(d) : ""}${section("Что изменилось", "Дом запоминает поступки, а не серию входов.")}${renderStoryPreview()}`;
+  bindHome();
+}
+function renderDailyCard(d) {
+  const progress = d.progress || {},
+    scenes = d.scenario.scenes || [],
+    scene = scenes[Number(progress.step) || 0];
+  return `<article class="card daily-scene" style="margin-top:10px"><span class="eyebrow">СЦЕНАРИЙ ДНЯ</span><h3>${esc(d.scenario.title)}</h3><p>${esc(scene?.text || d.scenario.teaser)}</p><div class="timeline">${scenes.map((_, i) => `<i class="${i <= Number(progress.step) ? "done" : ""}"></i>`).join("")}</div>${progress.completed_at ? '<span class="pill ok">Дом записал последствия</span>' : `<div class="button-row">${(scene?.actions || []).map((a) => `<button class="secondary" data-daily-action="${esc(a.key)}" data-id="${d.scenario.id}">${esc(a.label)}</button>`).join("")}</div>`}</article>`;
+}
+function renderStoryPreview() {
+  const items = state.v2.storylines || [];
+  if (!items.length)
+    return `<div class="card story-card"><h3>Дом пока наблюдает</h3><p>После нескольких решений появится личная сюжетная линия: архив, радиорубка, фотограф или поддельные документы.</p></div>`;
+  return items
+    .slice(0, 2)
+    .map(
+      (x) =>
+        `<div class="card story-card"><span class="eyebrow">ЛИЧНОЕ ДЕЛО · ГЛАВА ${Number(x.chapter) + 1}</span><h3>${esc(x.title)}</h3><p>${esc(x.description)}</p><button class="secondary" data-story="${x.id}">Продолжить</button></div>`,
+    )
+    .join("");
+}
+function bindHome() {
+  bindSceneInteractions(
+    { id: "home-elevator", ambience: "corridor" },
+    (hint) => {
+      const caption = $(".cinematic .scene-caption p");
+      if (caption) caption.textContent = hint;
+      toast("Дом ответил едва слышным стуком");
+    },
+  );
+  $('[data-action="solo-start"]')?.addEventListener("click", startExpedition);
+  $('[data-action="coop-open"]')?.addEventListener("click", () =>
+    setTab("coop"),
+  );
+  $$("[data-daily-action]").forEach(
+    (b) => (b.onclick = () => dailyAction(b.dataset.id, b.dataset.dailyAction)),
+  );
+  $$("[data-story]").forEach(
+    (b) => (b.onclick = () => storyChoice(b.dataset.story)),
+  );
+}
+async function dailyAction(id, action) {
+  try {
+    haptic();
+    effect("paper");
+    const result = await api(`/api/daily/${id}/action`, {
+      method: "POST",
+      body: JSON.stringify({ action, operationId: opId() }),
+    });
+    toast(
+      result.completed
+        ? "Событие завершено. Последствия останутся."
+        : "Дом изменил следующую сцену",
+    );
+    await bootstrap();
+  } catch (e) {
+    toast(e.message);
+  }
+}
+async function storyChoice(id) {
+  openSheet(
+    "Личное дело",
+    "Дом помнит ваш характер",
+    `<p>Это решение станет частью персональной линии.</p><div class="button-row"><button class="secondary" data-choice="investigate">Проверить факты</button><button class="secondary" data-choice="hide">Скрыть находку</button></div>`,
+  );
+  $$("[data-choice]", $("#sheetBody")).forEach(
+    (b) =>
+      (b.onclick = async () => {
+        await api(`/api/storylines/${id}/choice`, {
+          method: "POST",
+          body: JSON.stringify({ choice: b.dataset.choice }),
+        });
+        closeSheet();
+        toast("Запись добавлена в личное дело");
+        await bootstrap();
+      }),
+  );
+}
+
+function roomScene(exp) {
+  const room = exp.room;
+  const expeditionState = exp.state;
+  const hint =
+    state.listenHint?.roomId === room.id ? state.listenHint.text : null;
+  return `${cinematic({
+    kicker: `КОМНАТА ${exp.roomIndex + 1} ИЗ ${expeditionState.maxRooms} · ${room.ambience}`,
+    title: room.title,
+    text: hint || room.description,
+    number: String(exp.roomIndex + 8),
+    shadow: expeditionState.danger > 35,
+    ambience: room.ambience,
+  })}
+  <div class="floor-map" aria-label="Маршрут экспедиции">${Array.from({ length: expeditionState.maxRooms }, (_, index) => `<i class="${index < exp.roomIndex ? "passed" : index === exp.roomIndex ? "current" : ""}"></i>`).join("")}</div>
+  <div class="meter-grid"><div class="meter"><label>Самообладание <b>${expeditionState.nerve}</b></label><i style="--v:${expeditionState.nerve}%"></i></div><div class="meter"><label>Опасность <b>${expeditionState.danger}</b></label><i style="--v:${expeditionState.danger}%"></i></div><div class="meter"><label>Шум <b>${expeditionState.noise}</b></label><i style="--v:${expeditionState.noise}%"></i></div></div>
+  ${hint ? `<div class="card"><span class="eyebrow">УСЛЫШАННАЯ ПОДСКАЗКА</span><p>${esc(hint)}</p></div>` : ""}
+  <div class="choice-list">${room.choices.map((choice, index) => `<button class="choice-button ${hint && index === 0 ? "choice-recommended" : ""}" data-solo-choice="${index}"><b>${esc(choice.label)}</b><small>${choice.requires ? `${icon("key", "button-icon")} нужен предмет: ${esc(choice.requires)}` : "дом запомнит решение"}</small></button>`).join("")}</div>`;
+}
+function renderSoloExpedition() {
+  view.innerHTML = roomScene(state.expedition);
+  bindSceneInteractions(state.expedition.room);
+  $$("[data-solo-choice]").forEach(
+    (button) =>
+      (button.onclick = () => chooseSolo(Number(button.dataset.soloChoice))),
+  );
+  void loop("floor-ambience", 0.39);
+  if (state.expedition.state.danger > 40) void loop("whisper", 0.16);
+  updateTelegramNavigation();
+}
+
+function bindSceneInteractions(room, onReveal = () => renderSoloExpedition()) {
+  const scene = $(".cinematic");
+  if (!scene) return;
+  const listenButton = $("[data-scene-listen]", scene);
+  const lookButton = $("[data-scene-look]", scene);
+  const overlay = $(".listen-overlay", scene);
+  const hints = {
+    radio: "В радиошуме два удара повторяются раньше остальных.",
+    voices: "Голос справа не отражается от стены. Он находится ближе.",
+    wet: "Вода течёт против уклона пола — след ведёт не к двери.",
+    archive: "Одна папка лежит корешком внутрь. Её открывали недавно.",
+    dark: "За дверью тишина прерывается каждые восемь секунд.",
+    corridor: "Слева слышен ключ, справа — только дыхание.",
+  };
+  listenButton?.addEventListener("click", async () => {
+    if (state.listening) return;
+    state.listening = true;
+    listenButton.classList.add("active");
+    overlay.classList.add("active");
+    haptic("medium");
+    void ambient(
+      room?.ambience === "radio" ? "intercom" : "whisper",
+      0.34,
+      room?.ambience === "voices" ? 0.75 : -0.45,
+    );
+    await wait(state.motionReduced ? 250 : 1900);
+    const text = hints[room?.ambience] || hints.corridor;
+    state.listenHint = { roomId: room?.id, text };
+    $(".listen-copy", overlay).textContent = text;
+    haptic("success");
+    await wait(state.motionReduced ? 200 : 850);
+    overlay.classList.remove("active");
+    listenButton.classList.remove("active");
+    state.listening = false;
+    onReveal(text);
+    track("scene_listen", { roomId: room?.id, ambience: room?.ambience });
+  });
+  lookButton?.addEventListener("click", async () => {
+    lookButton.classList.add("active");
+    $(".scene-noise", scene)?.classList.add("active");
+    void effect("camera", 0.55, 0.3);
+    haptic();
+    await wait(420);
+    $(".scene-noise", scene)?.classList.remove("active");
+    lookButton.classList.remove("active");
+    toast("На снимке дверь кажется приоткрытой");
+    track("scene_inspect", { roomId: room?.id });
+  });
+  bindParallax(scene);
+}
+
+function bindParallax(scene) {
+  if (state.motionReduced || lowPerformance) return;
+  const move = (x, y) => {
+    scene.style.setProperty("--px", `${Math.max(-8, Math.min(8, x))}px`);
+    scene.style.setProperty("--py", `${Math.max(-5, Math.min(5, y))}px`);
+  };
+  scene.onpointermove = (event) => {
+    const rect = scene.getBoundingClientRect();
+    move(
+      ((event.clientX - rect.left) / rect.width - 0.5) * 14,
+      ((event.clientY - rect.top) / rect.height - 0.5) * 8,
+    );
+  };
+  scene.onpointerleave = () => move(0, 0);
+}
+async function startExpedition() {
+  try {
+    haptic("medium");
+    const request = api("/api/expeditions/start", {
+      method: "POST",
+      body: "{}",
+    });
+    const [, expedition] = await Promise.all([
+      playFloorTransition({ floor: 8, label: "Между седьмым и девятым" }),
+      request,
+    ]);
+    state.expedition = expedition;
+    state.listenHint = null;
+    track("expedition_start");
+    renderHome();
+  } catch (error) {
+    toast(error.message, "error");
+    haptic("error");
+  }
+}
+async function chooseSolo(choiceIndex) {
+  try {
+    $$("[data-solo-choice]").forEach((button) => (button.disabled = true));
+    const door = $(".hall-door");
+    door?.classList.add("door-opening");
+    void effect("door", 0.88, Math.random() * 0.4 - 0.2);
+    haptic("medium");
+    const result = await api(`/api/expeditions/${state.expedition.id}/action`, {
+      method: "POST",
+      body: JSON.stringify({ choiceIndex, operationId: opId() }),
+    });
+    toast(result.outcome);
+    track("room_choice", {
+      roomId: state.expedition.room?.id,
+      choiceIndex,
+      status: result.status,
+      listened: state.listenHint?.roomId === state.expedition.room?.id,
+    });
+    state.expedition = { ...state.expedition, ...result };
+    state.listenHint = null;
+    if (result.status === "active") {
+      await playFloorTransition({
+        floor: result.roomIndex + 8,
+        label: "Планировка меняется",
+      });
+      void effect("room", 0.72);
+      renderHome();
+    } else {
+      void effect(result.status === "escaped" ? "elevator" : "impact", 0.9);
+      haptic(result.status === "escaped" ? "success" : "error");
+      view.innerHTML = `<div class="card" style="text-align:center;padding:30px"><div class="app-badge">${icon(result.status === "escaped" ? "check" : "warning")} ВЫЛАЗКА ЗАВЕРШЕНА</div><h2 style="font-family:PT Serif">${result.status === "escaped" ? "Лифт вернул вас домой" : "Коридор закрылся раньше"}</h2><p>Улики: ${result.state.clues} · опасность: ${result.state.danger}</p><div class="floor-map">${Array.from({ length: result.state.maxRooms }, () => '<i class="passed"></i>').join("")}</div><button class="primary full" id="soloReturn">${icon("home", "button-icon")}Вернуться в квартиру</button></div>`;
+      $("#soloReturn").onclick = async () => {
+        if (result.status === "escaped")
+          await playFloorTransition({ floor: 1, label: "Возвращение домой" });
+        state.expedition = null;
+        await bootstrap({ quiet: true });
+      };
+    }
+  } catch (error) {
+    toast(error.message, "error");
+    haptic("error");
+    renderHome();
+  }
+}
+function socketEmit(event, payload = {}) {
+  return new Promise((resolve, reject) => {
+    if (!state.socket?.connected)
+      return reject(new Error("Нет соединения с домом"));
+    state.socket
+      .timeout(7000)
+      .emit(event, payload, (err, res) =>
+        err
+          ? reject(new Error("Дом не ответил"))
+          : res?.ok
+            ? resolve(res.data)
+            : reject(new Error(res?.error || "Операция не выполнена")),
+      );
+  });
+}
+function connectCoop(active = null) {
+  if (!window.io) return;
+  if (!state.socket) {
+    state.socket = window.io({
+      path: "/socket.io",
+      auth: { initData: resolveTelegramInitData(), devUserId: devUser },
+      transports: ["websocket", "polling"],
+      reconnection: true,
+      reconnectionAttempts: 30,
+      reconnectionDelay: 650,
+      reconnectionDelayMax: 4000,
+      randomizationFactor: 0.35,
+    });
+    state.socket.on("connect", () => {
+      $("#coopDot")?.classList.remove("hidden");
+      if (active?.id)
+        socketEmit("coop:resume", { matchId: active.id }).catch(() => {});
+    });
+    state.socket.on("disconnect", () => $("#coopDot")?.classList.add("hidden"));
+    state.socket.on("coop:state", async (data) => {
+      const previousRoom = state.coop?.roomIndex;
+      const previousPhase = state.coop?.phase;
+      state.coop = data;
+      if (
+        data.phase === "playing" &&
+        (previousPhase !== "playing" ||
+          (previousRoom != null && previousRoom !== data.roomIndex))
+      ) {
+        await playFloorTransition({
+          floor: Number(data.roomIndex || 0) + 8,
+          label: "Группа меняет комнату",
+        });
+      }
+      if (state.tab === "coop") renderCoop();
+    });
+    state.socket.on("coop:matched", async (data) => {
+      state.coop = data;
+      toast("Лифт нашёл попутчиков", "success");
+      await setTab("coop");
+    });
+    state.socket.on("connect_error", (error) => {
+      console.warn("socket", error.message);
+      $("#coopDot")?.classList.add("hidden");
+    });
+  } else if (active?.id && state.socket.connected)
+    socketEmit("coop:resume", { matchId: active.id }).catch(() => {});
+}
+function renderCoop() {
+  connectCoop(state.v2.activeCoop);
+  if (!state.coop) return renderCoopEntry();
+  const coop = state.coop;
+  if (["escaped", "lost", "cancelled"].includes(coop.phase))
+    return renderCoopEnd(coop);
+  const room = coop.rooms?.[0];
+  const remaining = coop.elevatorDeadlineAt
+    ? Math.max(
+        0,
+        Math.ceil(
+          (coop.elevatorDeadlineAt - (coop.serverTime || Date.now())) / 1000,
+        ),
+      )
+    : null;
+  view.innerHTML = `${section(
+    coop.phase === "lobby" ? "Лифт ждёт жильцов" : "Совместная вылазка",
+    coop.phase === "lobby"
+      ? "Код комнаты можно отправить знакомым."
+      : "Каждый видит только часть происходящего.",
+  )}<div class="coop-lift"><div class="coop-code">${esc(coop.code)}</div><div class="residents-grid">${coop.players
+    .map(
+      (player) =>
+        `<div class="resident"><span class="resident-avatar">${esc(player.name?.[0] || "?")}</span><div><b>${esc(player.name)}</b><small>${player.ready ? "готов" : "не готов"}${player.role ? ` · ${esc(player.role)}` : ""}</small></div><i class="dot ${player.connected ? "online" : ""}"></i></div>`,
+    )
+    .join(
+      "",
+    )}</div>${coop.private?.hint ? `<div class="private-note"><b>Только вы видите:</b><br>${esc(coop.private.hint)}</div>` : ""}${coop.private?.objective ? `<div class="private-note"><b>Скрытая цель:</b><br>${esc(coop.private.objective)}</div>` : ""}${coop.phase === "playing" ? `<div class="card-row"><div class="grow"><small>ДО ЗАКРЫТИЯ ЛИФТА</small><div class="countdown" data-deadline="${coop.elevatorDeadlineAt}">${formatTime(remaining)}</div></div><span class="pill warn">комната ${coop.roomIndex + 1}/${coop.roomsTotal || 6}</span></div>` : ""}</div>${coop.phase === "lobby" ? renderLobbyControls(coop) : renderCoopPlay(coop, room)}<div class="card"><h3>Записи группы</h3>${coop.log
+    .slice(-5)
+    .map((entry) => `<p>${esc(entry)}</p>`)
+    .join("")}</div>`;
+  bindCoop(coop);
+  if (coop.phase === "playing") {
+    startCoopTimer();
+    bindCoopScene(coop, room);
+  }
+  void loop("floor-ambience", 0.5);
+}
+
+function bindCoopScene(coop, room) {
+  const scene = $(".cinematic");
+  if (!scene || !room) return;
+  bindParallax(scene);
+  const listenButton = $("[data-scene-listen]", scene);
+  const lookButton = $("[data-scene-look]", scene);
+  const overlay = $(".listen-overlay", scene);
+  listenButton?.addEventListener("click", async () => {
+    listenButton.disabled = true;
+    listenButton.classList.add("active");
+    overlay.classList.add("active");
+    void ambient("whisper", 0.28, coop.private?.hint ? -0.7 : 0.7);
+    await wait(900);
+    $(".listen-copy", overlay).textContent =
+      coop.private?.hint || "Вы слышите только чужое дыхание.";
+    await coopAction("inspect", coop.id);
+    await wait(550);
+    overlay.classList.remove("active");
+    listenButton.classList.remove("active");
+    listenButton.disabled = false;
+  });
+  lookButton?.addEventListener("click", async () => {
+    lookButton.disabled = true;
+    $(".scene-noise", scene)?.classList.add("active");
+    void effect("camera", 0.55, 0.25);
+    await coopAction("mark", coop.id);
+    await wait(380);
+    $(".scene-noise", scene)?.classList.remove("active");
+    lookButton.disabled = false;
+  });
+}
+function renderCoopEntry() {
+  view.innerHTML = `${section("Войти вместе", "2–4 реальных игрока. Один коридор, разные подсказки.")}${cinematic({ kicker: "КООПЕРАТИВНАЯ НОЧЬ", title: "Лифт не поедет с одним пассажиром", text: "Создайте комнату, введите код знакомого или доверьтесь подбору.", shadow: false })}<div class="button-row" style="margin-top:9px"><button class="primary" data-coop="create">Создать комнату</button><button class="secondary" data-coop="matchmake">Найти жильцов</button></div><div class="card form-stack"><label>Код лифта<input id="coopCode" class="input" maxlength="6" placeholder="Например: VIII08"></label><button class="secondary" data-coop="join">Войти по коду</button></div><div class="card"><h3>Как это работает</h3><p>Действие одного меняет состояние комнаты у всех. Решение принимается голосованием. После обрыва соединения вы возвращаетесь в ту же вылазку.</p></div>`;
+  $$("[data-coop]").forEach(
+    (b) => (b.onclick = () => coopCommand(b.dataset.coop)),
+  );
+}
+function renderLobbyControls(c) {
+  const me =
+    c.players.find(
+      (p) => String(p.userId) === String(state.base.profile.user_id),
+    ) || {};
+  return `<div class="button-row" style="margin-top:8px"><button class="secondary" data-coop="ready">${me.ready ? "Снять готовность" : "Я готов"}</button>${String(c.hostId) === String(state.base.profile.user_id) ? '<button class="primary" data-coop="start">Закрыть двери</button>' : ""}<button class="danger" data-coop="leave">Выйти</button></div>`;
+}
+function renderCoopPlay(c, room) {
+  if (!room) return '<div class="empty">Комната проявляется…</div>';
+  return `${cinematic({ kicker: `ОБЩАЯ КОМНАТА ${c.roomIndex + 1}`, title: room.title, text: room.description, number: String(c.roomIndex + 8), shadow: c.shared.danger > 35 })}<div class="meter-grid"><div class="meter"><label>Нервы <b>${c.shared.nerve}</b></label><i style="--v:${c.shared.nerve}%"></i></div><div class="meter"><label>Опасность <b>${c.shared.danger}</b></label><i style="--v:${c.shared.danger}%"></i></div><div class="meter"><label>Улики <b>${c.shared.clues}</b></label><i style="--v:${Math.min(100, c.shared.clues * 12)}%"></i></div></div><div class="action-wheel"><button class="secondary" data-coop-action="inspect">Осмотреть отдельно</button><button class="secondary" data-coop-action="help">Поддержать жильца</button><button class="secondary" data-coop-action="mark">Оставить метку</button><button class="secondary" data-coop-action="light">Включить свет</button></div>${section("Общее решение", "Голос каждого видят все, но личную подсказку — только вы.")}<div class="vote-grid">${room.choices.map((choice, i) => `<button class="choice-button ${Object.values(c.votes || {}).includes(i) ? "voted" : ""}" data-coop-vote="${i}"><b>${esc(choice.label)}</b><small>${Object.values(c.votes || {}).filter((v) => v === i).length} голосов</small></button>`).join("")}</div>`;
+}
+function renderCoopEnd(c) {
+  view.innerHTML = `<div class="card" style="text-align:center;padding:34px"><span class="eyebrow">ГРУППОВАЯ ВЫЛАЗКА</span><h2 style="font-family:PT Serif">${c.phase === "escaped" ? "Все вернулись к лифту" : c.phase === "lost" ? "Лифт закрылся" : "Комната распущена"}</h2><p>${c.log?.at(-1) || ""}</p><button class="primary" data-coop="reset">Вернуться в подъезд</button></div>`;
+  $$("[data-coop]").forEach(
+    (b) => (b.onclick = () => coopCommand(b.dataset.coop)),
+  );
+}
+function bindCoop(c) {
+  $$("[data-coop]").forEach(
+    (b) => (b.onclick = () => coopCommand(b.dataset.coop, c)),
+  );
+  $$("[data-coop-action]").forEach(
+    (b) => (b.onclick = () => coopAction(b.dataset.coopAction, c.id)),
+  );
+  $$("[data-coop-vote]").forEach(
+    (b) => (b.onclick = () => coopVote(Number(b.dataset.coopVote), c.id)),
+  );
+}
+async function coopCommand(command, c = state.coop) {
+  try {
+    connectCoop();
+    if (command === "create")
+      state.coop = await socketEmit("coop:create", { maxPlayers: 4 });
+    if (command === "matchmake") {
+      const r = await socketEmit("coop:matchmake", {});
+      if (r.queued)
+        toast(
+          `Вы в очереди${r.position != null ? " · позиция " + (r.position + 1) : ""}`,
+        );
+      else state.coop = r.state;
+    }
+    if (command === "join")
+      state.coop = await socketEmit("coop:join", {
+        code: $("#coopCode")?.value?.trim().toUpperCase(),
+      });
+    if (command === "ready")
+      state.coop = await socketEmit("coop:ready", {
+        matchId: c.id,
+        ready: !c.players.find(
+          (p) => String(p.userId) === String(state.base.profile.user_id),
+        )?.ready,
+      });
+    if (command === "start")
+      state.coop = await socketEmit("coop:start", { matchId: c.id });
+    if (command === "leave") {
+      await socketEmit("coop:leave", { matchId: c.id });
+      state.coop = null;
+    }
+    if (command === "reset") {
+      state.coop = null;
+      state.v2.activeCoop = null;
+    }
+    haptic("medium");
+    renderCoop();
+  } catch (e) {
+    toast(e.message);
+  }
+}
+async function coopAction(action, matchId) {
+  try {
+    state.coop = await socketEmit("coop:action", { matchId, action });
+    effect(action === "light" ? "elevator-bell" : "room");
+    haptic();
+    renderCoop();
+  } catch (e) {
+    toast(e.message);
+  }
+}
+async function coopVote(choiceIndex, matchId) {
+  try {
+    state.coop = await socketEmit("coop:vote", { matchId, choiceIndex });
+    effect("paper", 0.5);
+    renderCoop();
+  } catch (e) {
+    toast(e.message);
+  }
+}
+function startCoopTimer() {
+  clearInterval(startCoopTimer.i);
+  startCoopTimer.i = setInterval(() => {
+    const el = $("[data-deadline]");
+    if (!el) return clearInterval(startCoopTimer.i);
+    const sec = Math.max(
+      0,
+      Math.ceil((Number(el.dataset.deadline) - Date.now()) / 1000),
+    );
+    el.textContent = formatTime(sec);
+  }, 1000);
+}
+function formatTime(sec) {
+  if (sec == null) return "—";
+  return `${String(Math.floor(sec / 60)).padStart(2, "0")}:${String(sec % 60).padStart(2, "0")}`;
+}
+
+function renderBuilding() {
+  const b = state.v2.building;
+  view.innerHTML = `${section(b.building?.title || "Ваш подъезд", "Постоянное сообщество до 30 реальных жильцов.")}<div class="building-hero"><div><span class="eyebrow">${esc(b.building?.code || "П-???")}</span><div class="building-code">${b.members.length} жильцов</div><p>Старший: ${esc(b.building?.elder_name || "ещё не выбран")} · доверие дома ${b.building?.trust_score || 0}</p><div class="progress-track"><i style="width:${Math.min(100, Number(b.building?.shared_progress || 0))}%"></i></div></div><button class="round-button" data-building="invite" aria-label="Пригласить жильца">${icon("plus")}</button></div>${section("Доска объявлений", "Записи видит только ваш подъезд.", '<button class="secondary" data-building="post">Оставить запись</button>')}<div>${b.posts.length ? b.posts.map((p) => `<article class="board-post"><small>${esc(p.author_name)} · ${fmtDate(p.created_at)}</small><p>${esc(p.body)}</p></article>`).join("") : '<div class="empty">На доске пока только следы от кнопок.</div>'}</div>${section("Жильцы", "Доверие формируется поступками, его нельзя купить.")}<div class="card member-list">${b.members.map((m) => `<div class="member"><span class="resident-avatar">${esc(m.first_name?.[0] || "?")}</span><div><b>${esc(m.first_name)}</b><small>кв. ${m.apartment_no}${m.profession ? " · " + roleName(m.profession) : ""}</small></div><div style="text-align:right"><i class="dot ${m.online ? "online" : ""}"></i><small>${m.local_trust} доверия</small></div></div>`).join("")}</div>${section("Общий склад", "Предметы можно оставить соседям или взять для общей цели.")}<div class="storage-grid">${b.storage.length ? b.storage.map((x) => `<div class="storage-item"><div class="icon">${itemIcon(x.item_id)}</div><b>${esc(itemName(x.item_id))}</b><p>На складе: ${x.quantity}</p><button class="tiny-button" data-storage="withdraw" data-item="${x.item_id}">Взять 1</button></div>`).join("") : '<div class="empty" style="grid-column:1/-1">Склад пуст.</div>'}</div><button class="secondary full" data-building="deposit" style="margin-top:8px">Положить предмет на склад</button>${section("Голосования", "Решения меняют последствия для всего подъезда.")}<div>${b.votes.length ? b.votes.map(renderVote).join("") : '<div class="empty">Открытых голосований нет.</div>'}</div>${section("Цель недели", "Совместный прогресс сохраняется для подъезда.")}<div>${b.goals.map((g) => `<div class="card"><h3>${esc(g.title)}</h3><div class="progress-track"><i style="width:${Math.min(100, (Number(g.progress) / Number(g.target)) * 100)}%"></i></div><p>${g.progress}/${g.target}</p></div>`).join("")}</div>`;
+  bindBuilding();
+}
+function renderVote(v) {
+  const opts = Array.isArray(v.options) ? v.options : [];
+  return `<div class="card"><span class="eyebrow">${v.status === "open" ? "ГОЛОСОВАНИЕ ОТКРЫТО" : "РЕШЕНИЕ ПРИНЯТО"}</span><h3>${esc(v.title)}</h3><p>${esc(v.description)}</p><div class="button-row">${v.status === "open" ? opts.map((o) => `<button class="secondary" data-vote="${v.id}" data-option="${esc(o.key)}">${esc(o.label)}</button>`).join("") : `<span class="pill">${esc(v.result?.winner || "без решения")}</span>`}</div></div>`;
+}
+function bindBuilding() {
+  $$("[data-building]").forEach(
+    (b) => (b.onclick = () => buildingAction(b.dataset.building)),
+  );
+  $$("[data-storage]").forEach(
+    (b) => (b.onclick = () => storageAction(b.dataset.item, b.dataset.storage)),
+  );
+  $$("[data-vote]").forEach(
+    (b) => (b.onclick = () => castVote(b.dataset.vote, b.dataset.option)),
+  );
+}
+async function buildingAction(action) {
+  if (action === "invite") return shareInvite();
+  if (action === "post") {
+    openSheet(
+      "Доска подъезда",
+      "Запись останется у всех жильцов",
+      `<div class="form-stack"><textarea id="postBody" maxlength="500" placeholder="Что произошло в доме?"></textarea><button class="primary" id="postSend">Приколоть к доске</button></div>`,
+    );
+    $("#postSend").onclick = async () => {
+      try {
+        await api("/api/building/posts", {
+          method: "POST",
+          body: JSON.stringify({ body: $("#postBody").value }),
+        });
+        closeSheet();
+        toast("Запись появилась на доске");
+        await bootstrap();
+        setTab("building");
+      } catch (e) {
+        toast(e.message);
+      }
+    };
+  }
+  if (action === "deposit") {
+    const items = state.base.inventory.filter((x) => x.quantity > 0);
+    openSheet(
+      "Общий склад",
+      "Выберите предмет",
+      `<div class="inventory-grid">${items.map((x) => `<button class="inventory-item" data-deposit="${x.item_id}"><span class="icon">${itemIcon(x.item_id)}</span><b>${esc(x.name || x.item_id)}</b><em>×${x.quantity}</em></button>`).join("")}</div>`,
+    );
+    $$("[data-deposit]", $("#sheetBody")).forEach(
+      (b) => (b.onclick = () => storageAction(b.dataset.deposit, "deposit")),
+    );
+  }
+}
+async function storageAction(itemId, direction) {
+  try {
+    await api("/api/building/storage", {
+      method: "POST",
+      body: JSON.stringify({
+        itemId,
+        quantity: 1,
+        direction,
+        operationId: opId(),
+      }),
+    });
+    closeSheet();
+    toast(
+      direction === "deposit"
+        ? "Предмет оставлен соседям"
+        : "Предмет забран со склада",
+    );
+    await bootstrap();
+    setTab("building");
+  } catch (e) {
+    toast(e.message);
+  }
+}
+async function castVote(id, optionKey) {
+  try {
+    await api(`/api/building/votes/${id}`, {
+      method: "POST",
+      body: JSON.stringify({ optionKey }),
+    });
+    toast("Ваш голос записан");
+    await bootstrap();
+    setTab("building");
+  } catch (e) {
+    toast(e.message);
+  }
+}
+function shareInvite() {
+  const link = state.base.referralLink,
+    text = "В нашем подъезде появилась дверь с твоим именем. Зайди в лифт.";
+  if (tg?.openTelegramLink)
+    tg.openTelegramLink(
+      `https://t.me/share/url?url=${encodeURIComponent(link)}&text=${encodeURIComponent(text)}`,
+    );
+  else
+    navigator.clipboard.writeText(link).then(() => toast("Ссылка скопирована"));
+}
+
+function renderArchive() {
+  const tabs = [
+    ["apartment", "Квартира"],
+    ["collections", "Коллекции"],
+    ["roles", "Профессия"],
+    ["stories", "Личные дела"],
+  ];
+  view.innerHTML = `<div class="market-toolbar">${tabs.map(([id, label]) => `<button class="${state.archiveTab === id ? "primary" : "secondary"}" data-archive-tab="${id}">${label}</button>`).join("")}</div><div id="archiveBody"></div>`;
+  $$("[data-archive-tab]").forEach(
+    (b) =>
+      (b.onclick = () => {
+        state.archiveTab = b.dataset.archiveTab;
+        renderArchive();
+      }),
+  );
+  renderArchiveBody();
+}
+function renderArchiveBody() {
+  const root = $("#archiveBody");
+  if (state.archiveTab === "apartment") return renderApartment(root);
+  if (state.archiveTab === "collections") return renderCollections(root);
+  if (state.archiveTab === "roles") return renderRoles(root);
+  renderStories(root);
+}
+function renderApartment(root) {
+  const placed = new Map(state.base.apartment.map((x) => [Number(x.slot), x]));
+  root.innerHTML = `${section(`Квартира №${state.base.profile.apartment_no}`, "Предметы имеют историю владельцев и могут открывать сцены.")}<div class="apartment">${Array.from(
+    { length: 12 },
+    (_, i) => {
+      const p = placed.get(i);
+      return `<button class="apartment-slot" data-slot="${i}">${p?.icon || "·"}</button>`;
+    },
+  ).join(
+    "",
+  )}</div>${section("Вещи у двери", "Выберите предмет и свободное место.")}<div class="inventory-grid">${state.base.inventory.length ? state.base.inventory.map((x) => `<button class="inventory-item ${state.selectedItem === x.item_id ? "selected" : ""}" data-item="${x.item_id}"><span class="icon">${itemIcon(x.item_id)}</span><b>${esc(x.name || x.item_id)}</b><p>${esc(x.description || "")}</p><em>×${x.quantity}</em></button>`).join("") : '<div class="empty">Пока пусто.</div>'}</div>`;
+  $$("[data-item]", root).forEach(
+    (b) =>
+      (b.onclick = () => {
+        state.selectedItem = b.dataset.item;
+        renderApartment(root);
+        toast("Теперь выберите место в комнате");
+      }),
+  );
+  $$("[data-slot]", root).forEach(
+    (b) => (b.onclick = () => placeItem(Number(b.dataset.slot))),
+  );
+}
+async function placeItem(slot) {
+  if (!state.selectedItem) return toast("Сначала выберите предмет");
+  try {
+    await api("/api/apartment/place", {
+      method: "POST",
+      body: JSON.stringify({ itemId: state.selectedItem, slot, rotation: 0 }),
+    });
+    effect("place");
+    state.selectedItem = null;
+    await bootstrap();
+    state.archiveTab = "apartment";
+    setTab("archive");
+  } catch (e) {
+    toast(e.message);
+  }
+}
+function renderCollections(root) {
+  const c = state.v2.collections;
+  root.innerHTML = `${section("Коллекции дома", "Завершение открывает комнату, историю или интерьер — не процент силы.")}<div class="collection-grid">${c.collections
+    .map((x) => {
+      const total = (x.entries || []).reduce(
+        (sum, e) => sum + Number(e.needed || 0),
+        0,
+      );
+      const found = (x.entries || []).reduce(
+        (sum, e) => sum + Math.min(Number(e.owned || 0), Number(e.needed || 0)),
+        0,
+      );
+      return `<article class="collection-card ${x.complete ? "complete" : ""}"><span class="eyebrow">${x.seasonal ? "СЕЗОННАЯ" : "АРХИВ"}</span><h3>${esc(x.title)}</h3><p>${esc(x.description)}</p><progress max="${Math.max(1, total)}" value="${found}"></progress><small>${found}/${total}</small>${x.complete && !x.claimed ? `<button class="tiny-button full" data-claim="${x.id}">Открыть награду</button>` : ""}</article>`;
+    })
+    .join(
+      "",
+    )}</div>${section("Тихие достижения", "Часть условий раскрывается только после выполнения.")}<div>${c.achievements.map((a) => `<div class="card"><h3 class="${a.hidden && !a.unlocked_at ? "achievement-secret" : ""}">${esc(a.unlocked_at ? a.title : a.hidden ? "Запись скрыта" : a.title)}</h3><p>${esc(a.unlocked_at ? a.description : a.hidden ? "Дом ещё не разрешил прочитать условие." : a.description)}</p>${a.unlocked_at ? '<span class="pill ok">найдено</span>' : ""}</div>`).join("")}</div>`;
+  $$("[data-claim]", root).forEach(
+    (b) => (b.onclick = () => claimCollection(b.dataset.claim)),
+  );
+}
+async function claimCollection(id) {
+  try {
+    await api(`/api/collections/${id}/claim`, { method: "POST", body: "{}" });
+    toast("Коллекция открыла новую часть дома");
+    await bootstrap();
+    state.archiveTab = "collections";
+    setTab("archive");
+  } catch (e) {
+    toast(e.message);
+  }
+}
+function roleName(key) {
+  return (
+    state.v2?.roles?.[key]?.title ||
+    {
+      electrician: "Электрик",
+      archivist: "Архивист",
+      locksmith: "Слесарь",
+      photographer: "Фотограф",
+      courier: "Курьер",
+      radio: "Радиолюбитель",
+      chairman: "Председатель",
+      observer: "Наблюдатель",
+    }[key] ||
+    key
+  );
+}
+function renderRoles(root) {
+  const current = state.v2.role?.role_key;
+  root.innerHTML = `${section("Профессия жильца", "Это не класс с цифрами: профессия меняет решения, инструменты и социальную пользу.")}<div class="role-grid">${Object.entries(
+    state.v2.roles || {},
+  )
+    .map(
+      ([key, r]) =>
+        `<article class="role-card ${current === key ? "current" : ""}"><span class="eyebrow">${current === key ? "ВАША РОЛЬ" : "ДОСТУПНАЯ РОЛЬ"}</span><h3>${esc(r.title)}</h3><p>${esc(r.description)}</p><div class="button-row"><span class="pill">${esc(r.tool)}</span>${current !== key ? `<button class="tiny-button" data-role="${key}">Выбрать</button>` : ""}</div></article>`,
+    )
+    .join("")}</div>`;
+  $$("[data-role]", root).forEach(
+    (b) => (b.onclick = () => chooseRole(b.dataset.role)),
+  );
+}
+async function chooseRole(role) {
+  try {
+    await api(`/api/roles/${role}`, { method: "POST", body: "{}" });
+    toast(`Новая профессия: ${roleName(role)}`);
+    await bootstrap();
+    state.archiveTab = "roles";
+    setTab("archive");
+  } catch (e) {
+    toast(e.message);
+  }
+}
+function renderStories(root) {
+  root.innerHTML = `${section("Персональные сюжетные линии", "Дом выдаёт истории по поступкам: ложь, помощь, звук, фотографии и брошенные соседи.")}<div>${state.v2.storylines.length ? state.v2.storylines.map((x) => `<article class="card story-card"><span class="eyebrow">ГЛАВА ${Number(x.chapter) + 1}</span><h3>${esc(x.title)}</h3><p>${esc(x.description)}</p><button class="secondary" data-story="${x.id}">Сделать выбор</button></article>`).join("") : '<div class="empty">Дом ещё собирает ваше личное дело.</div>'}</div>`;
+  $$("[data-story]", root).forEach(
+    (b) => (b.onclick = () => storyChoice(b.dataset.story)),
+  );
+}
+
+async function loadMarket() {
+  try {
+    state.market = await api("/api/market");
+    renderMarket();
+  } catch (e) {
+    toast(e.message);
+  }
+}
+function renderMarket() {
+  const tabs = [
+    ["market", "Лоты"],
+    ["sell", "Продать"],
+    ["shop", "Stars"],
+    ["purchases", "Покупки"],
+  ];
+  view.innerHTML = `<div class="market-toolbar">${tabs.map(([id, label]) => `<button class="${state.marketTab === id ? "primary" : "secondary"}" data-market-tab="${id}">${label}</button>`).join("")}</div><div id="marketBody"></div>`;
+  $$("[data-market-tab]").forEach(
+    (b) =>
+      (b.onclick = async () => {
+        state.marketTab = b.dataset.marketTab;
+        if (state.marketTab === "market" && !state.market) await loadMarket();
+        else renderMarket();
+      }),
+  );
+  if (state.marketTab === "market") renderPlayerMarket();
+  if (state.marketTab === "sell") renderSell();
+  if (state.marketTab === "shop") renderStarsShop();
+  if (state.marketTab === "purchases") renderPurchases();
+}
+function renderPlayerMarket() {
+  const root = $("#marketBody");
+  if (!state.market) {
+    root.innerHTML =
+      '<div class="loading-scene"><p>Считаем записи в книге обмена…</p></div>';
+    return void loadMarket();
+  }
+  const m = state.market;
+  root.innerHTML = `${section("Рынок жильцов", `Расчёт внутренними марками. Комиссия дома ${m.commissionPercent}%. Stars не выводятся и не обмениваются.`)}<div>${m.listings.length ? m.listings.map((x) => `<article class="card listing"><div><span class="eyebrow">${x.anonymous ? "АНОНИМНЫЙ ЛОТ" : esc(x.seller_name || "Жилец")}</span><h3>${esc(itemName(x.item_id))}</h3><p>${x.remaining} шт. · до ${fmtDate(x.expires_at)}</p></div><div style="text-align:right"><div class="price">${x.price_per_unit} марок</div>${x.mine ? '<span class="pill">ваш лот</span>' : `<button class="tiny-button" data-buy-listing="${x.id}">Купить 1</button>`}</div></article>`).join("") : '<div class="empty">Активных лотов нет.</div>'}</div>${
+    m.history.length
+      ? `<div class="card"><h3>История цен</h3><div class="history-line">${m.history
+          .slice(0, 30)
+          .reverse()
+          .map(
+            (x) =>
+              `<i style="height:${Math.max(5, Math.min(100, Number(x.avg_price)))}%" title="${x.avg_price}"></i>`,
+          )
+          .join("")}</div></div>`
+      : ""
+  }`;
+  $$("[data-buy-listing]", root).forEach(
+    (b) => (b.onclick = () => buyListing(b.dataset.buyListing)),
+  );
+}
+async function buyListing(id) {
+  try {
+    await api(`/api/market/listings/${id}/buy`, {
+      method: "POST",
+      body: JSON.stringify({ quantity: 1, operationId: opId() }),
+    });
+    toast("Сделка записана в книгу владельцев");
+    state.market = null;
+    await bootstrap();
+    state.marketTab = "market";
+    setTab("market");
+  } catch (e) {
+    toast(e.message);
+  }
+}
+function renderSell() {
+  const items = state.base.inventory.filter(
+    (x) => x.quantity > 0 && !x.item_id.startsWith("story_"),
+  );
+  $("#marketBody").innerHTML =
+    `${section("Выставить находку", "Сюжетные предметы и билеты продавать нельзя.")}<form id="sellForm" class="card form-stack"><label>Предмет<select name="itemId">${items.map((x) => `<option value="${x.item_id}">${esc(x.name || x.item_id)} · ${x.quantity} шт.</option>`).join("")}</select></label><label>Количество<input type="number" name="quantity" min="1" max="100" value="1"></label><label>Цена за единицу, марки<input type="number" name="price" min="1" max="100000" value="10"></label><label class="switch-row"><span>Скрыть имя продавца</span><input type="checkbox" name="anonymous"></label><button class="primary">Опубликовать лот</button></form>`;
+  $("#sellForm").onsubmit = async (e) => {
+    e.preventDefault();
+    const f = new FormData(e.currentTarget);
+    try {
+      await api("/api/market/listings", {
+        method: "POST",
+        body: JSON.stringify({
+          itemId: f.get("itemId"),
+          quantity: Number(f.get("quantity")),
+          price: Number(f.get("price")),
+          anonymous: f.get("anonymous") === "on",
+          operationId: opId(),
+        }),
+      });
+      toast("Лот появился на рынке");
+      state.market = null;
+      state.marketTab = "market";
+      renderMarket();
+    } catch (err) {
+      toast(err.message);
+    }
+  };
+}
+function renderStarsShop() {
+  const products = state.base.shop || [];
+  $("#marketBody").innerHTML =
+    `${section("Сюжетные покупки", "Полные главы, кооперативные ночи, интерьеры и подарки. Никакой покупки победы.")}<div class="shop-grid">${products.map((x) => `<article class="shop-item"><span class="eyebrow">${x.limited_until ? `ДО ${fmtDate(x.limited_until)}` : "TELEGRAM STARS"}</span><div class="shop-product-visual">${productIcon(x)}</div><h3>${esc(x.title)}</h3><p>${esc(x.description)}</p>${x.full_contents ? `<small>${esc(Array.isArray(x.full_contents) ? x.full_contents.join(" · ") : JSON.stringify(x.full_contents))}</small>` : ""}<div class="button-row"><button class="tiny-button" data-buy="${x.sku}">★ ${x.stars}</button><button class="tiny-button secondary" data-gift="${x.sku}">Подарить</button></div></article>`).join("")}</div>`;
+  $$("[data-buy]").forEach((b) => (b.onclick = () => buyStars(b.dataset.buy)));
+  $$("[data-gift]").forEach(
+    (b) => (b.onclick = () => giftProduct(b.dataset.gift)),
+  );
+}
+async function buyStars(sku) {
+  try {
+    const { invoiceLink, purchaseId } = await api(`/api/shop/${sku}/invoice`, {
+      method: "POST",
+      body: "{}",
+    });
+    if (!tg?.openInvoice)
+      throw new Error("Счёт Stars открывается только внутри Telegram");
+    tg.openInvoice(invoiceLink, (status) => {
+      if (status === "paid") {
+        effect("purchase");
+        toast("Оплата подтверждена. Проверяем выдачу…");
+        pollPurchase(purchaseId);
+      } else if (status === "cancelled") toast("Счёт закрыт");
+    });
+  } catch (e) {
+    toast(e.message);
+  }
+}
+async function pollPurchase(id) {
+  for (let i = 0; i < 12; i++) {
+    await new Promise((r) => setTimeout(r, 850));
+    try {
+      const p = await api(`/api/purchases/${id}/status`);
+      if (p.status === "paid") {
+        toast("Покупка выдана");
+        await bootstrap();
+        return;
+      }
+    } catch {}
+  }
+  toast("Платёж принят. История обновится позже.");
+}
+function giftProduct(sku) {
+  const members = state.v2.building.members.filter(
+    (x) => String(x.id) !== String(state.base.profile.user_id),
+  );
+  openSheet(
+    "Подарок жильцу",
+    "Telegram Stars",
+    `<div class="form-stack"><label>Получатель<select id="giftTarget">${members.map((m) => `<option value="${m.id}">${esc(m.first_name)} · кв. ${m.apartment_no}</option>`).join("")}</select></label><label>Подпись<textarea id="giftMessage" maxlength="160" placeholder="Оставьте короткую записку"></textarea></label><label class="switch-row"><span>Анонимно</span><input id="giftAnonymous" type="checkbox"></label><button class="primary" id="giftPay">Выставить счёт</button></div>`,
+  );
+  $("#giftPay").onclick = async () => {
+    try {
+      const r = await api(`/api/gifts/${sku}/invoice`, {
+        method: "POST",
+        body: JSON.stringify({
+          targetId: Number($("#giftTarget").value),
+          message: $("#giftMessage").value,
+          anonymous: $("#giftAnonymous").checked,
+        }),
+      });
+      tg.openInvoice(r.invoiceLink, (status) => {
+        if (status === "paid") {
+          closeSheet();
+          toast("Подарок отправлен");
+        }
+      });
+    } catch (e) {
+      toast(e.message);
+    }
+  };
+}
+function renderPurchases() {
+  const p = state.v2.purchases || [];
+  $("#marketBody").innerHTML =
+    `${section("История покупок", "Статус, выдача, возврат и восстановление после сбоя.")}<div class="card">${p.length ? p.map((x) => `<div class="purchase-row"><div><b>${esc(x.title || x.sku)}</b><small>${fmtDate(x.created_at)} · ${x.stars} ★</small></div><div style="text-align:right"><span class="pill ${x.status === "paid" ? "ok" : x.status === "refunded" ? "bad" : ""}">${esc(x.status)}</span>${x.status === "paid" && !x.revoked_at ? `<button class="tiny-button" data-restore="${x.id}">Восстановить</button>` : ""}</div></div>`).join("") : "<p>Покупок пока нет.</p>"}</div><button class="secondary full" data-more="support-payment">Проблема с оплатой</button>`;
+  $$("[data-restore]").forEach(
+    (b) => (b.onclick = () => restorePurchase(b.dataset.restore)),
+  );
+  $('[data-more="support-payment"]')?.addEventListener("click", () => {
+    state.tab = "more";
+    state.moreTab = "support";
+    render();
+  });
+}
+async function restorePurchase(id) {
+  try {
+    await api(`/api/purchases/${id}/restore`, { method: "POST", body: "{}" });
+    toast("Сервер повторно проверил выдачу");
+    await bootstrap();
+    state.marketTab = "purchases";
+    setTab("market");
+  } catch (e) {
+    toast(e.message);
+  }
+}
+function itemIconName(id) {
+  const map = {
+    matchbox: "spark",
+    chalk: "note",
+    cassette: "radio",
+    brass_key: "key",
+    torn_photo: "camera",
+    fuse: "signal",
+    spare_key: "key",
+    black_thread: "clue",
+    archive_stamp: "archive",
+    blackout_ticket: "door",
+    company_night_ticket: "coop",
+    radio: "radio",
+    plant_fern: "spark",
+    darkroom_wallpaper: "collection",
+    old_door_collection: "door",
+  };
+  return map[id] || "collection";
+}
+function itemIcon(id, className = "ui-icon") {
+  return icon(itemIconName(id), className);
+}
+function productIcon(product) {
+  const type = product?.product_type || product?.type || "pack";
+  return icon(
+    type.includes("coop")
+      ? "coop"
+      : type.includes("chapter")
+        ? "archive"
+        : type.includes("limited")
+          ? "collection"
+          : "gift",
+    "shop-product-icon",
+  );
+}
+
+function itemName(id) {
+  return (
+    state.base?.inventory?.find((x) => x.item_id === id)?.name ||
+    id.replaceAll("_", " ")
+  );
+}
+
+function renderMore() {
+  const tabs = [
+    ["settings", "Система", "settings"],
+    ["signal", "Радио", "radio"],
+    ["notes", "Записки", "note"],
+    ["gifts", "Подарки", "gift"],
+    ["support", "Связь", "support"],
+  ];
+  view.innerHTML = `<div class="market-toolbar">${tabs
+    .map(
+      ([id, label, iconName]) =>
+        `<button class="${state.moreTab === id ? "primary" : "secondary"}" data-more-tab="${id}">${icon(iconName, "button-icon")}${label}</button>`,
+    )
+    .join("")}</div><div id="moreBody"></div>`;
+  $$("[data-more-tab]").forEach(
+    (button) =>
+      (button.onclick = () => {
+        state.moreTab = button.dataset.moreTab;
+        renderMore();
+      }),
+  );
+  renderMoreBody();
+}
+function renderMoreBody() {
+  if (state.moreTab === "settings") return renderSettings();
+  if (state.moreTab === "signal") return renderSignalRitual();
+  if (state.moreTab === "support") return renderSupport();
+  if (state.moreTab === "notes") return renderNotes();
+  return renderGifts();
+}
+function renderSettings() {
+  $("#moreBody").innerHTML =
+    `${section("Дом звучит слоями", "Звуковая сцена сводится в реальном времени и меняется вместе с этажом.")}
+  <div class="card form-stack">
+    <div class="headphone-callout">${icon("headphones")}<div><b>Пространственный звук</b><p>Шаги, лифт и голоса получают направление. Для полной сцены используйте наушники.</p></div></div>
+    <label>Окружение <output>${state.audio.ambience}</output><input data-audio="ambience" type="range" min="0" max="100" value="${state.audio.ambience}"></label>
+    <label>События <output>${state.audio.effects}</output><input data-audio="effects" type="range" min="0" max="100" value="${state.audio.effects}"></label>
+    <label class="switch-row"><span>Вибрация</span><input data-audio="vibration" type="checkbox" ${state.audio.vibration ? "checked" : ""}></label>
+    <label class="switch-row"><span>Полная тишина</span><input data-audio="mute" type="checkbox" ${state.audio.mute ? "checked" : ""}></label>
+    <label class="switch-row"><span>Уменьшить анимации</span><input data-motion type="checkbox" ${state.motionReduced ? "checked" : ""}></label>
+    <button class="secondary" id="settingsAudioTest">${icon("signal", "button-icon")}Проверить левую и правую стену</button>
+  </div>
+  <div class="card"><div class="app-badge">${icon("spark")} ПРИЛОЖЕНИЕ</div><h3>Установить вход в дом</h3><p>Telegram поддерживает полноэкранный режим и добавление Mini App на главный экран на совместимых устройствах.</p><div class="button-row"><button class="secondary" id="fullscreenRequest">На весь экран</button><button class="secondary" id="homeScreenRequest">На главный экран</button></div></div>
+  <div class="card"><h3>Аккаунт жильца</h3><p>Версия ${esc(state.v2.appVersion || APP_VERSION)} · сессия ${esc(state.sessionId.slice(0, 8))} · устройство ${lowPerformance ? "бережный режим" : "полная графика"}</p><button class="secondary full" id="shareInvite">${icon("send", "button-icon")}Пригласить знакомого</button></div>`;
+  $$("[data-audio]").forEach(
+    (input) =>
+      (input.oninput = () =>
+        updateAudio(
+          input.dataset.audio,
+          input.type === "checkbox" ? input.checked : Number(input.value),
+        )),
+  );
+  $("[data-motion]").onchange = (event) => {
+    state.motionReduced = event.target.checked;
+    localStorage.setItem("ef_reduce_motion", state.motionReduced ? "1" : "0");
+    document.body.classList.toggle("reduce-motion", state.motionReduced);
+  };
+  $("#settingsAudioTest").onclick = () => audioEngine.testSpace();
+  $("#shareInvite").onclick = shareInvite;
+  $("#fullscreenRequest").onclick = () => tg?.requestFullscreen?.();
+  $("#homeScreenRequest").onclick = () => {
+    if (tg?.addToHomeScreen) tg.addToHomeScreen();
+    else if (state.installPrompt) state.installPrompt.prompt();
+    else toast("Установка недоступна в этой версии Telegram");
+  };
+}
+function updateAudio(key, value) {
+  state.audio[key] = value;
+  localStorage.setItem(
+    `ef_${key}`,
+    key === "mute" || key === "vibration" ? (value ? "1" : "0") : String(value),
+  );
+  audioEngine.applyVolumes();
+  if (key === "mute" && value) audioEngine.stopAll();
+  else startHouseAudio();
+  const use = $("#soundIconUse");
+  use?.setAttribute(
+    "href",
+    `/assets/icons.svg#${state.audio.mute ? "mute" : "sound"}`,
+  );
+  if (state.moreTab === "settings" && $("#moreBody")) renderSettings();
+}
+
+async function playKnock(long = false, pan = 0) {
+  const ready = await audioEngine.unlock();
+  if (!ready || !audioEngine.context)
+    return effect("impact", long ? 0.16 : 0.1, pan);
+  const context = audioEngine.context;
+  const oscillator = context.createOscillator();
+  const gain = context.createGain();
+  const panner = context.createStereoPanner?.();
+  const now = context.currentTime;
+  const duration = long ? 0.31 : 0.105;
+  oscillator.type = "triangle";
+  oscillator.frequency.setValueAtTime(long ? 78 : 112, now);
+  oscillator.frequency.exponentialRampToValueAtTime(48, now + duration);
+  gain.gain.setValueAtTime(0.0001, now);
+  gain.gain.exponentialRampToValueAtTime(long ? 0.34 : 0.23, now + 0.008);
+  gain.gain.exponentialRampToValueAtTime(0.0001, now + duration);
+  oscillator.connect(gain);
+  if (panner) {
+    panner.pan.value = pan;
+    gain.connect(panner);
+    panner.connect(audioEngine.effectsBus);
+  } else gain.connect(audioEngine.effectsBus);
+  oscillator.start(now);
+  oscillator.stop(now + duration + 0.03);
+  haptic(long ? "medium" : "light");
+}
+
+async function renderSignalRitual() {
+  const root = $("#moreBody");
+  if (!state.signalRitual) {
+    root.innerHTML =
+      '<div class="loading-scene"><i></i><p>Приёмник ищет частоту…</p></div>';
+    try {
+      state.signalRitual = await api("/api/ritual/signal");
+      state.signalAnswer = [];
+    } catch (error) {
+      root.innerHTML = `<div class="card"><h3>Радиорубка закрыта</h3><p>${esc(error.message)}</p></div>`;
+      return;
+    }
+  }
+  const ritual = state.signalRitual;
+  const remaining = Math.max(0, ritual.maxAttempts - ritual.attempts);
+  root.innerHTML = `${section("Частота между этажами", "Раз в ночь дом передаёт ритм. Услышьте его и повторите короткие и длинные удары.")}
+  <div class="signal-console">
+    <div class="app-badge">${icon("radio")} РАДИОРУБКА · 00:08</div>
+    <div class="signal-screen"><div class="signal-trace"></div></div>
+    <div class="timeline" id="signalAnswer">${Array.from({ length: 5 }, (_, index) => `<i class="${state.signalAnswer?.[index] != null ? "done" : ""}" style="height:${state.signalAnswer?.[index] === 1 ? 18 : 7}px"></i>`).join("")}</div>
+    ${ritual.completedAt ? `<div class="card"><span class="pill ok">Сигнал расшифрован</span><p>Вы получили ${ritual.reward.clues} улику и ${ritual.reward.marks} марок дома. В архиве появилась скрытая запись.</p></div>` : `<p>Попыток осталось: <b>${remaining}</b></p><div class="button-row"><button class="secondary" id="signalPlay">${icon("sound", "button-icon")}Прослушать</button><button class="secondary" id="signalShort">Короткий</button><button class="secondary" id="signalLong">Длинный</button></div><div class="button-row" style="margin-top:8px"><button class="secondary" id="signalReset">Сбросить</button><button class="primary" id="signalSubmit" ${state.signalAnswer?.length === 5 ? "" : "disabled"}>Проверить ритм</button></div>`}
+  </div>`;
+  if (ritual.completedAt) return;
+  $("#signalPlay").onclick = async () => {
+    $("#signalPlay").disabled = true;
+    for (let index = 0; index < ritual.pattern.length; index += 1) {
+      await playKnock(ritual.pattern[index] === 1, index % 2 ? 0.45 : -0.45);
+      await wait(ritual.pattern[index] === 1 ? 520 : 330);
+    }
+    $("#signalPlay").disabled = false;
+  };
+  const add = async (value) => {
+    if (state.signalAnswer.length >= 5) return;
+    state.signalAnswer.push(value);
+    await playKnock(value === 1, value ? 0.35 : -0.35);
+    renderSignalRitual();
+  };
+  $("#signalShort").onclick = () => add(0);
+  $("#signalLong").onclick = () => add(1);
+  $("#signalReset").onclick = () => {
+    state.signalAnswer = [];
+    renderSignalRitual();
+  };
+  $("#signalSubmit").onclick = async () => {
+    try {
+      const result = await api("/api/ritual/signal", {
+        method: "POST",
+        body: JSON.stringify({ answer: state.signalAnswer }),
+      });
+      state.signalRitual = result;
+      state.signalAnswer = [];
+      if (result.correct) {
+        void effect("purchase", 0.7);
+        haptic("success");
+        toast("Сигнал принят. Архив пополнился.", "success");
+        await bootstrap({ quiet: true });
+      } else {
+        void effect("impact", 0.28);
+        haptic("warning");
+        toast("Ритм не совпал. Приёмник всё ещё работает.", "warning");
+      }
+      state.moreTab = "signal";
+      renderMore();
+    } catch (error) {
+      toast(error.message, "error");
+    }
+  };
+}
+function renderSupport() {
+  const s = state.v2.support;
+  $("#moreBody").innerHTML =
+    `${section("Служба дома", "Telegram ID, версия, последняя вылазка и покупка прикладываются автоматически.", '<button class="secondary" id="newTicket">Новое обращение</button>')}<div>${
+      s.tickets.length
+        ? s.tickets
+            .map(
+              (t) =>
+                `<article class="card"><span class="eyebrow">${esc(t.category)} · ${esc(t.status)}</span><h3>${esc(t.subject)}</h3><p>${fmtDate(t.updated_at)}</p>${s.messages
+                  .filter((m) => m.ticket_id === t.id)
+                  .map(
+                    (m) =>
+                      `<div class="private-note"><b>${m.from_user ? "Вы" : m.admin_name || "Домоуправление"}</b><br>${esc(m.body)}</div>`,
+                  )
+                  .join(
+                    "",
+                  )}<button class="tiny-button" data-ticket-reply="${t.id}">Ответить</button></article>`,
+            )
+            .join("")
+        : '<div class="empty">Обращений нет.</div>'
+    }</div>`;
+  $("#newTicket").onclick = openTicketForm;
+  $$("[data-ticket-reply]").forEach(
+    (b) => (b.onclick = () => ticketReply(b.dataset.ticketReply)),
+  );
+}
+function openTicketForm() {
+  openSheet(
+    "Новое обращение",
+    "Служба дома",
+    `<form id="ticketForm" class="form-stack"><label>Категория<select name="category"><option value="bug">Ошибка</option><option value="payment">Оплата</option><option value="account">Аккаунт</option><option value="moderation">Жалоба</option><option value="idea">Предложение</option><option value="other">Другое</option></select></label><label>Тема<input name="subject" minlength="3" maxlength="120" required></label><label>Сообщение<textarea name="body" minlength="3" maxlength="3000" required></textarea></label><label>Скриншот<input name="screenshot" type="file" accept="image/png,image/jpeg,image/webp"></label><button class="primary">Отправить</button></form>`,
+  );
+  $("#ticketForm").onsubmit = async (e) => {
+    e.preventDefault();
+    const f = new FormData(e.currentTarget),
+      file = f.get("screenshot");
+    let screenshot;
+    if (file?.size) screenshot = await fileData(file);
+    try {
+      await api("/api/support", {
+        method: "POST",
+        body: JSON.stringify({
+          category: f.get("category"),
+          subject: f.get("subject"),
+          body: f.get("body"),
+          screenshot,
+          appVersion: state.v2.appVersion,
+          context: { tab: state.tab },
+        }),
+      });
+      closeSheet();
+      toast("Обращение передано домоуправлению");
+      await bootstrap();
+      state.moreTab = "support";
+      setTab("more");
+    } catch (err) {
+      toast(err.message);
+    }
+  };
+}
+function fileData(file) {
+  return new Promise((resolve, reject) => {
+    const r = new FileReader();
+    r.onload = () => resolve(r.result);
+    r.onerror = reject;
+    r.readAsDataURL(file);
+  });
+}
+function ticketReply(id) {
+  openSheet(
+    "Ответить поддержке",
+    "Журнал обращения",
+    `<div class="form-stack"><textarea id="replyBody" maxlength="3000"></textarea><button id="replySend" class="primary">Отправить</button></div>`,
+  );
+  $("#replySend").onclick = async () => {
+    try {
+      await api(`/api/support/${id}/messages`, {
+        method: "POST",
+        body: JSON.stringify({ body: $("#replyBody").value }),
+      });
+      closeSheet();
+      toast("Ответ добавлен");
+      await bootstrap();
+      state.moreTab = "support";
+      setTab("more");
+    } catch (e) {
+      toast(e.message);
+    }
+  };
+}
+function renderNotes() {
+  const notes = state.base.notes || [];
+  $("#moreBody").innerHTML =
+    `${section("Записки у двери", "Нежелательное сообщение можно отправить на проверку.")}<div>${notes.length ? notes.map((n) => `<article class="board-post"><small>${esc(n.author_name || "Неизвестный жилец")} · ${fmtDate(n.created_at)}</small><p>${esc(n.body)}</p><button class="tiny-button" data-report-note="${n.id}" data-author="${n.author_id}">Пожаловаться</button></article>`).join("") : '<div class="empty">Под дверью ничего нет.</div>'}</div>${section("Оставить соседу", "Записка будет доставлена асинхронно.")}<div class="card form-stack"><select id="noteTarget">${state.v2.building.members
+      .filter((m) => String(m.id) !== String(state.base.profile.user_id))
+      .map(
+        (m) =>
+          `<option value="${m.id}">${esc(m.first_name)} · кв. ${m.apartment_no}</option>`,
+      )
+      .join(
+        "",
+      )}</select><textarea id="noteBody" maxlength="280"></textarea><button id="noteSend" class="primary">Оставить у двери</button></div>`;
+  $("#noteSend").onclick = sendNote;
+  $$("[data-report-note]").forEach(
+    (b) =>
+      (b.onclick = () =>
+        reportEntity(b.dataset.author, "note", b.dataset.reportNote)),
+  );
+}
+async function sendNote() {
+  try {
+    await api("/api/social/note", {
+      method: "POST",
+      body: JSON.stringify({
+        targetId: $("#noteTarget").value,
+        body: $("#noteBody").value,
+        mood: "strange",
+      }),
+    });
+    effect("paper");
+    toast("Записка оставлена");
+    await bootstrap();
+    state.moreTab = "notes";
+    setTab("more");
+  } catch (e) {
+    toast(e.message);
+  }
+}
+function reportEntity(targetId, entityType, entityId) {
+  openSheet(
+    "Жалоба",
+    "Модерация подъезда",
+    `<div class="form-stack"><select id="reportReason"><option value="spam">Спам</option><option value="abuse">Оскорбление</option><option value="fraud">Мошенничество</option><option value="other">Другое</option></select><textarea id="reportDetails" maxlength="1000"></textarea><button id="reportSend" class="danger">Отправить на проверку</button></div>`,
+  );
+  $("#reportSend").onclick = async () => {
+    try {
+      await api("/api/reports", {
+        method: "POST",
+        body: JSON.stringify({
+          targetId: String(targetId),
+          entityType,
+          entityId,
+          reason: $("#reportReason").value,
+          details: $("#reportDetails").value,
+        }),
+      });
+      closeSheet();
+      toast("Жалоба зарегистрирована");
+    } catch (e) {
+      toast(e.message);
+    }
+  };
+}
+function renderGifts() {
+  const gifts = state.v2.gifts || [];
+  $("#moreBody").innerHTML =
+    `${section("Подарки у двери", "Билеты, интерьеры и кассеты от реальных жильцов.")}<div>${gifts.length ? gifts.map((g) => `<article class="card"><span class="eyebrow">${g.anonymous ? "АНОНИМНЫЙ ПОДАРОК" : esc(g.sender_name || "Жилец")}</span><h3>${esc(g.title || g.sku)}</h3><p>${esc(g.message || "Без записки")}</p><span class="pill ${g.status === "delivered" ? "warn" : "ok"}">${esc(g.status)}</span>${g.status === "delivered" ? `<button class="tiny-button" data-claim-gift="${g.id}">Принять</button>` : ""}</article>`).join("") : '<div class="empty">Подарков пока нет.</div>'}</div>`;
+  $$("[data-claim-gift]").forEach(
+    (b) => (b.onclick = () => claimGift(b.dataset.claimGift)),
+  );
+}
+async function claimGift(id) {
+  try {
+    await api(`/api/gifts/${id}/claim`, { method: "POST", body: "{}" });
+    toast("Подарок принят");
+    await bootstrap();
+    state.moreTab = "gifts";
+    setTab("more");
+  } catch (e) {
+    toast(e.message);
+  }
+}
+
+function renderTutorial() {
+  const t = state.v2.tutorial,
+    step = Number(t.step),
+    current = t.current;
+  if (!current) return $("#tutorialOverlay").classList.add("hidden");
+  const overlay = $("#tutorialOverlay");
+  overlay.classList.remove("hidden");
+  const visual = tutorialVisual(current.action);
+  overlay.innerHTML = `<div class="tutorial-frame ${current.action !== "open_door" ? "open" : ""}" data-tutorial-frame><div class="tutorial-visual">${visual}</div><div class="tutorial-copy"><div class="tutorial-progress">${t.steps.map((_, i) => `<i class="${i <= step ? "done" : ""}"></i>`).join("")}</div><span class="eyebrow">ПЕРВАЯ НОЧЬ · ${step + 1}/${t.total}</span><h1>${esc(current.title)}</h1><p>${esc(current.text)}</p><button class="primary full" id="tutorialAction" ${current.action === "inspect_room" ? "disabled" : ""}>${esc(current.cta)}</button></div></div>`;
+  bindTutorial(current.action);
+}
+function tutorialVisual(action) {
+  if (action === "open_door")
+    return '<div class="tutorial-door-left"></div><div class="tutorial-door-right"></div><div class="bulb"></div>';
+  if (action === "inspect_room")
+    return `${cinematic({ title: "Коридор уже знает ваше имя", text: "Найдите три детали.", shadow: true, tools: false })}<button class="inspect-point" style="left:20%;top:32%" data-inspect="1"></button><button class="inspect-point" style="right:21%;top:48%" data-inspect="2"></button><button class="inspect-point" style="left:48%;top:20%" data-inspect="3"></button>`;
+  if (action === "take_item")
+    return '<div class="tutorial-object">▣</div><div class="lamp-cone"></div>';
+  if (action === "make_choice")
+    return `${cinematic({ title: "Тук · тук-тук", text: "За дверью дышат в вашем ритме.", number: "?", shadow: true, tools: false })}`;
+  if (action === "lose_nerve")
+    return '<div class="tutorial-object" style="font-size:90px">◉</div><div class="shadow-person" style="right:42%;top:25%"></div>';
+  if (action === "return_home")
+    return '<div class="tutorial-door-left" style="transform:translateX(-70%)"></div><div class="tutorial-door-right" style="transform:translateX(70%)"></div><div class="coop-code" style="padding-top:30px">00:08</div>';
+  if (action === "place_item")
+    return '<div class="tutorial-object">▣</div><div class="apartment" style="position:absolute;inset:12% 8% 4%;height:auto"><button class="apartment-slot">·</button></div>';
+  if (action === "read_note")
+    return '<div class="tutorial-note">Не отвечай консьержу.<br>Его не существует.<br><br>— квартира 8</div>';
+  return '<div class="hall-door" data-number="ТВОЙ ДРУГ" style="bottom:20%;width:145px"></div><div class="lamp-cone"></div>';
+}
+function bindTutorial(action) {
+  if (action === "inspect_room") {
+    $$("[data-inspect]").forEach(
+      (p) =>
+        (p.onclick = () => {
+          p.classList.add("done");
+          state.tutorialInspect.add(p.dataset.inspect);
+          effect("camera", 0.45);
+          if (state.tutorialInspect.size >= 3)
+            $("#tutorialAction").disabled = false;
+        }),
+    );
+  }
+  $("#tutorialAction").onclick = async () => {
+    try {
+      if (action === "open_door") {
+        $("[data-tutorial-frame]").classList.add("open");
+        effect("elevator");
+        await new Promise((r) => setTimeout(r, 900));
+      }
+      if (action === "take_item") effect("paper");
+      if (action === "make_choice") effect("door");
+      if (action === "lose_nerve") {
+        effect("impact");
+        haptic("heavy");
+      }
+      if (action === "return_home") effect("elevator");
+      if (action === "place_item") effect("place");
+      if (action === "read_note") effect("paper");
+      const result = await api("/api/tutorial/action", {
+        method: "POST",
+        body: JSON.stringify({ action }),
+      });
+      state.v2.tutorial = { ...state.v2.tutorial, ...result };
+      state.tutorialInspect.clear();
+      if (result.completed) {
+        $("#tutorialOverlay").classList.add("hidden");
+        toast("Вы заселены. Дом уже знает ваше имя.");
+        await bootstrap();
+      } else {
+        state.v2.tutorial.current = result.current;
+        renderTutorial();
+      }
+    } catch (e) {
+      toast(e.message);
+    }
+  };
+}
+
+function openSheet(title, kicker, html) {
+  $("#sheetTitle").textContent = title;
+  $("#sheetKicker").textContent = kicker;
+  $("#sheetBody").innerHTML = html;
+  $("#sheet").showModal();
+  updateTelegramNavigation();
+  haptic();
+}
+function closeSheet() {
+  if ($("#sheet").open) $("#sheet").close();
+  updateTelegramNavigation();
+}
+
+$("#sheetClose").onclick = closeSheet;
+$("#sheet").addEventListener("click", (event) => {
+  if (event.target === $("#sheet")) closeSheet();
+});
+$("#dailyRibbon").onclick = async () => {
+  if (state.tab !== "home") await setTab("home");
+  document
+    .querySelector(".daily-scene")
+    ?.scrollIntoView({ behavior: state.motionReduced ? "auto" : "smooth" });
+};
+$("#bottomNav").onclick = (event) => {
+  const button = event.target.closest("[data-tab]");
+  if (button) void setTab(button.dataset.tab);
+};
+$("#soundButton").onclick = () => {
+  $("#soundPanel").classList.toggle("hidden");
+  startHouseAudio();
+  updateTelegramNavigation();
+};
+$("#soundClose").onclick = () => {
+  $("#soundPanel").classList.add("hidden");
+  updateTelegramNavigation();
+};
+$("#ambienceVolume").value = state.audio.ambience;
+$("#effectsVolume").value = state.audio.effects;
+$("#muteToggle").checked = state.audio.mute;
+$("#vibrationToggle").checked = state.audio.vibration;
+$("#motionToggle").checked = state.motionReduced;
+$("#ambienceValue").textContent = state.audio.ambience;
+$("#effectsValue").textContent = state.audio.effects;
+$("#soundIconUse")?.setAttribute(
+  "href",
+  `/assets/icons.svg#${state.audio.mute ? "mute" : "sound"}`,
+);
+$("#ambienceVolume").oninput = (event) => {
+  $("#ambienceValue").textContent = event.target.value;
+  updateAudio("ambience", Number(event.target.value));
+};
+$("#effectsVolume").oninput = (event) => {
+  $("#effectsValue").textContent = event.target.value;
+  updateAudio("effects", Number(event.target.value));
+};
+$("#muteToggle").onchange = (event) =>
+  updateAudio("mute", event.target.checked);
+$("#vibrationToggle").onchange = (event) =>
+  updateAudio("vibration", event.target.checked);
+$("#motionToggle").onchange = (event) => {
+  state.motionReduced = event.target.checked;
+  localStorage.setItem("ef_reduce_motion", state.motionReduced ? "1" : "0");
+  document.body.classList.toggle("reduce-motion", state.motionReduced);
+};
+$("#audioTest").onclick = () => audioEngine.testSpace();
+
+document.addEventListener("pointerdown", () => startHouseAudio(), {
+  once: true,
+});
+document.addEventListener("visibilitychange", () => {
+  if (document.hidden) clearTimeout(state.ambientTimer);
+  else startHouseAudio();
+});
+
+window.addEventListener("beforeinstallprompt", (event) => {
+  event.preventDefault();
+  state.installPrompt = event;
+  $("#installButton")?.classList.remove("hidden");
+});
+$("#installButton").onclick = async () => {
+  if (tg?.addToHomeScreen) tg.addToHomeScreen();
+  else if (state.installPrompt) {
+    await state.installPrompt.prompt();
+    state.installPrompt = null;
+    $("#installButton")?.classList.add("hidden");
+  }
+};
+tg?.onEvent?.("homeScreenAdded", () => {
+  $("#installButton")?.classList.add("hidden");
+  toast("Вход в дом добавлен на главный экран", "success");
+});
+tg?.onEvent?.("fullscreenChanged", () => {
+  document.body.classList.toggle(
+    "telegram-fullscreen",
+    Boolean(tg?.isFullscreen),
+  );
+});
+
+setInterval(() => {
+  const now = new Date();
+  const time = `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`;
+  $("#buildingClock").textContent =
+    `${time} · ${navigator.onLine ? "дом не спит" : "связь прервана"}`;
+}, 1000);
+
+window.addEventListener("pagehide", () => {
+  navigator.sendBeacon?.(`/api/sessions/${state.sessionId}/end`);
+  audioEngine.stopAll();
+});
+window.addEventListener("error", (event) =>
+  track("client_error", {
+    message: event.message,
+    source: event.filename,
+    line: event.lineno,
+  }),
+);
+window.addEventListener("unhandledrejection", (event) =>
+  track("client_error", { message: String(event.reason) }),
+);
+
+if ("serviceWorker" in navigator) {
+  window.addEventListener("load", () =>
+    navigator.serviceWorker
+      .register("/sw.js")
+      .catch((error) => console.warn("service worker", error)),
+  );
+}
+
 bootstrap();
