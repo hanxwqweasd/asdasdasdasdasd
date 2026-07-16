@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
-"""Generate the Eighth Floor cinematic audio pack.
+"""Generate the Eighth Floor naturalistic audio pack.
 
-All assets are original procedural synthesis. No external recordings or samples.
-Output: 48 kHz stereo AAC/M4A + Vorbis/OGG, with 24-bit WAV impulse responses.
+All assets are original procedural acoustic models. No external recordings or samples.
+Output: 48 kHz stereo AAC/M4A with restrained peaks and natural room distance.
 """
 from __future__ import annotations
 
@@ -20,7 +20,7 @@ SR = 48_000
 ROOT = Path(__file__).resolve().parents[1]
 OUT = ROOT / "public" / "audio"
 TMP = ROOT / ".audio-build"
-R = np.random.default_rng(808_401)
+R = np.random.default_rng(808_430)
 
 OUT.mkdir(parents=True, exist_ok=True)
 TMP.mkdir(parents=True, exist_ok=True)
@@ -169,11 +169,13 @@ def add_reverb(x: np.ndarray, ir: np.ndarray, wet=.16) -> np.ndarray:
 
 
 def write_asset(name: str, x: np.ndarray, kind: str = "effect", ogg_q: int = 6, aac_rate: str | None = None) -> None:
-    target=OUT/f"{name}.m4a"
-    if target.exists() and target.stat().st_size>1000:
-        print("skip",name,flush=True); return
     print("encoding", name, flush=True)
-    x=master(x,peak=.88 if kind=="effect" else .72)
+    # Naturalistic release: no near-0 dB transients. Headroom prevents phone speakers
+    # and Telegram volume normalization from turning mechanical sounds into clicks.
+    x=np.asarray(x,dtype=np.float64)
+    x=filt(x,"highpass",28,2)
+    x=filt(x,"lowpass",11800 if kind=="effect" else 9800,3)
+    x=master(x,peak=.39 if kind=="effect" else .42)
     wav=TMP/f"{name}.wav"
     sf.write(wav,x,SR,subtype="PCM_24")
     if aac_rate is None: aac_rate="160k" if kind=="effect" else "128k"
@@ -184,11 +186,15 @@ def write_ir(name: str, ir: np.ndarray) -> None:
     sf.write(OUT/f"{name}.wav",ir,SR,subtype="PCM_24")
 
 
-def click(freq=1300,duration=.075,body=.14,pan=0):
-    n=nframes(duration); e=envelope(n,.001,duration*.72,1.8)
-    attack=filt(noise(duration),"bandpass",(900,9000))*e*.32
-    bodytone=(oscillator(freq,duration)*.16+oscillator(freq*.51,duration,"triangle")*.06)*e
-    return pan_mono(attack+bodytone,pan,width=.08)
+def click(freq=900,duration=.09,body=.14,pan=0):
+    """Muted mechanical contact, intentionally without a sharp digital transient."""
+    duration=max(.07,float(duration)*1.25)
+    n=nframes(duration)
+    e=envelope(n,.004,duration*.68,1.2)
+    contact=filt(noise(duration),"bandpass",(180,2600),3)*e*.12
+    resonance=max(220,min(980,float(freq)*.42))
+    bodytone=(oscillator(resonance,duration)*.055+oscillator(resonance*.51,duration,"triangle")*.025)*e
+    return add_reverb(pan_mono(contact+bodytone,pan,width=.05),ROOM_IR,.045)
 
 
 def thump(duration=.32,freq=72,pan=0):
@@ -198,12 +204,15 @@ def thump(duration=.32,freq=72,pan=0):
     return pan_mono(x,pan,width=.04)
 
 
-def bell(base=880,duration=2.1,pan=0):
-    x=np.zeros(nframes(duration))
-    for mult,amp,dec in [(1,.55,2.1),(2.01,.22,2.8),(2.72,.12,3.4),(4.13,.055,4.8)]:
-        t=time(duration); x+=oscillator(base*mult,duration)*np.exp(-t*dec)*amp
-    x*=envelope(len(x),.001,.06)
-    return pan_mono(x,pan,width=.18)
+def bell(base=560,duration=2.1,pan=0):
+    """Old elevator chime heard through a metal grille, not a bright game bell."""
+    base=min(float(base),620)
+    x=np.zeros(nframes(duration)); t=time(duration)
+    for mult,amp,dec in [(1,.22,2.4),(1.51,.07,3.1),(2.03,.035,4.2)]:
+        x+=oscillator(base*mult,duration)*np.exp(-t*dec)*amp
+    x+=filt(noise(duration),"bandpass",(180,2100),3)*np.exp(-t*4.4)*.025
+    x*=envelope(len(x),.012,.22)
+    return add_reverb(pan_mono(x,pan,width=.12),CORRIDOR_IR,.24)
 
 
 def door(opening=True):
@@ -234,34 +243,40 @@ def elevator_travel():
 
 
 def room_shift():
-    d=2.7;t=time(d)
-    whoosh=filt(stereo_noise(d,"pink",.05),"bandpass",(90,4900))*np.sin(np.pi*np.clip(t/d,0,1))[:,None]*.33
-    low=pan_mono(oscillator(np.linspace(78,41,len(t)),d)*envelope(len(t),.08,.7)*.24)
-    harmonic=np.zeros((len(t),2))
-    for f,a in [(97,.13),(146,.08),(194,.05),(291,.025)]: harmonic+=pan_mono(oscillator(f,d)*np.exp(-t*1.1)*a, R.uniform(-.2,.2))
-    return add_reverb(whoosh+low+harmonic,CORRIDOR_IR,.24)
+    """Walls, timber and plaster settling around the listener."""
+    d=3.8; out=np.zeros((nframes(d),2))
+    for ts,p,start_f,end_f,g in [(.05,-.55,145,78,.075),(.78,.42,118,64,.06),(1.68,-.1,92,54,.052)]:
+        dur=1.55
+        groan=oscillator(np.linspace(start_f,end_f,nframes(dur)),dur,"triangle")*envelope(nframes(dur),.22,.62)*g
+        groan+=filt(noise(dur),"bandpass",(70,780),3)*envelope(nframes(dur),.18,.68)*g*.42
+        place(out,ts,groan,1,pan=p)
+    dust=filt(stereo_noise(d,"pink",.18),"bandpass",(140,1800),3)*np.sin(np.pi*np.clip(time(d)/d,0,1))[:,None]*.018
+    out+=dust
+    return add_reverb(out,CORRIDOR_IR,.38)
 
 
 def scary_hit():
-    d=1.8; out=np.zeros((nframes(d),2))
-    place(out,0,thump(.9,47,0),1.2)
-    shard=filt(noise(.24),"highpass",1900)*envelope(nframes(.24),.001,.19)*.24
-    place(out,.028,shard,1,pan=.18)
-    t=time(1.5); ring=(oscillator(64,1.5)*.32+oscillator(91,1.5)*.12)*np.exp(-t*2.1)
-    place(out,.02,ring,1,pan=-.08)
-    return add_reverb(out,CORRIDOR_IR,.32)
+    """A soft pressure change and building resonance; no jump-scare transient."""
+    d=2.4; t=time(d); out=np.zeros((nframes(d),2))
+    pressure=filt(noise(d,"brown"),"lowpass",120)*envelope(nframes(d),.09,.8)*.12
+    resonance=(oscillator(np.linspace(54,39,nframes(d)),d)*.12+oscillator(83,d)*.035)*np.exp(-t*1.45)
+    out+=pan_mono(pressure+resonance,0,width=.16)
+    settle=filt(noise(1.35),"bandpass",(110,950),3)*envelope(nframes(1.35),.16,.58)*.055
+    place(out,.42,settle,1,pan=.18)
+    return add_reverb(out,CORRIDOR_IR,.4)
 
 
 def tonal_ui(notes, duration=.62, pan=0, dark=False):
+    """Low-level analogue resonance used only beneath physical actions."""
     out=np.zeros(nframes(duration)); t=time(duration)
-    for i,(freq,at,amp) in enumerate(notes):
+    for freq,at,amp in notes:
         remain=max(.08,duration-at); tt=time(remain)
-        wave=oscillator(freq,remain)*np.exp(-tt*(5.2 if dark else 4.1))*amp
-        wave+=oscillator(freq*2.005,remain)*np.exp(-tt*7.5)*amp*.16
-        place_out=np.zeros_like(out); start=int(at*SR); place_out[start:start+len(wave)]=wave[:len(out)-start]
-        out+=place_out
-    out*=envelope(len(out),.003,.05)
-    return add_reverb(pan_mono(out,pan,width=.08),ROOM_IR,.12)
+        f=max(90,min(780,float(freq)*.62))
+        wave=oscillator(f,remain)*np.exp(-tt*(4.5 if dark else 3.8))*amp*.42
+        wave+=filt(noise(remain),"bandpass",(120,1800),3)*np.exp(-tt*6.0)*amp*.08
+        start=int(at*SR); out[start:start+len(wave)]+=wave[:len(out)-start]
+    out*=envelope(len(out),.012,.18)
+    return add_reverb(pan_mono(out,pan,width=.06),ROOM_IR,.1)
 
 
 def ambience_home():
@@ -303,9 +318,9 @@ def ambience_archive():
     out+=pan_mono(oscillator(50,d)*.028+oscillator(100,d)*.01,0,width=.08)
     tape=filt(stereo_noise(d),"highpass",4500)*.008
     out+=tape
-    for ts in np.arange(1.0,d-1,1.0):
-        tick=click(2700,.025,pan=-.35 if int(ts)%2 else .35)
-        place(out,float(ts),tick,.075)
+    for ts in [5.8,13.6,22.4,31.9,38.2]:
+        tick=click(720,.07,pan=R.uniform(-.45,.45))
+        place(out,float(ts),tick,.045)
     for ts in [9.4,25.6,35.1]:
         rustle=filt(noise(.9),"bandpass",(500,6500))*envelope(nframes(.9),.03,.3)*.08
         place(out,ts,rustle,1,pan=R.uniform(-.7,.7))
@@ -337,7 +352,7 @@ def ambience_tension(high=False):
     if high:
         beat=(.5+.5*np.sin(2*np.pi*1.02*t))**7
         out+=pan_mono(filt(noise(d),"lowpass",105)*beat*.045,0)
-        for ts in [5.7,13.3,21.4,28.8]: place(out,ts,scary_hit()[:nframes(.8)],.06,pan=R.uniform(-.7,.7))
+        out+=filt(stereo_noise(d,"pink",.18),"bandpass",(70,260),3)*(0.008+0.008*np.sin(2*np.pi*.071*t))[:,None]
     return seamless(out,2)
 
 
@@ -408,73 +423,74 @@ write_asset("whisper",whisper_variant(980),"effect")
 # Mechanical / environmental one-shots.
 write_asset("elevator-travel",elevator_travel())
 write_asset("elevator",elevator_travel())
-write_asset("elevator-arrive",tonal_ui([(620,0,.28),(930,.035,.14)],1.7,0,dark=True)+bell(760,1.7)*.55)
-write_asset("elevator-bell",bell(820,2.55))
-write_asset("elevator-button",click(1540,.12,pan=-.18))
-write_asset("elevator-brake",add_reverb(pan_mono(chirp(time(.85),f0=1360,f1=540,t1=.85,method="quadratic")*envelope(nframes(.85),.04,.4)*.25,.12),CORRIDOR_IR,.2))
-for i,f in enumerate([610,690,780],1): write_asset(f"floor-tick-{i:02d}",click(f,.075,pan=(i-2)*.12))
+write_asset("elevator-arrive",bell(510,2.0)*.72)
+write_asset("elevator-bell",bell(535,2.6))
+write_asset("elevator-button",click(620,.12,pan=-.18)*.72)
+brake=np.zeros((nframes(1.35),2)); friction=filt(noise(1.05),"bandpass",(90,1350),3)*envelope(nframes(1.05),.12,.5)*.10; place(brake,0,friction,1,pan=.08); place(brake,.72,thump(.5,48,.04),.32); write_asset("elevator-brake",add_reverb(brake,CORRIDOR_IR,.28))
+for i,f in enumerate([420,470,510],1): write_asset(f"floor-tick-{i:02d}",click(f,.095,pan=(i-2)*.1)*.62)
 write_asset("door-open",door(True)); write_asset("door-close",door(False)); write_asset("door",door(True))
-write_asset("door-lock",tonal_ui([(220,0,.22),(1320,.04,.16),(740,.12,.11)],.7,-.1,dark=True))
-write_asset("key-turn",add_reverb(click(1100,.16,pan=-.15)+np.pad(click(740,.11,pan=.12),((nframes(.08),0),(0,0)))[:nframes(.16)],ROOM_IR,.12))
+write_asset("door-lock",add_reverb(click(520,.15,pan=-.1)*.68,ROOM_IR,.13))
+key=np.zeros((nframes(.72),2)); scrape=filt(noise(.42),"bandpass",(180,2400),3)*envelope(nframes(.42),.04,.18)*.07; place(key,.02,scrape,1,pan=-.12); place(key,.34,click(480,.12,pan=.1),.55); write_asset("key-turn",add_reverb(key,ROOM_IR,.16))
 write_asset("room-shift",room_shift()); write_asset("room",room_shift())
 write_asset("danger-hit",scary_hit()); write_asset("impact",scary_hit())
-write_asset("camera",tonal_ui([(2200,0,.26),(1250,.055,.14),(1900,.21,.2)],.72,.18,dark=True))
+camera=np.zeros((nframes(.72),2)); place(camera,.04,click(520,.1,pan=.12),.42); shutter=filt(noise(.22),"bandpass",(180,2800),3)*envelope(nframes(.22),.008,.13)*.08; place(camera,.12,shutter,1,pan=.15); place(camera,.28,click(390,.1,pan=.08),.28); write_asset("camera",add_reverb(camera,ROOM_IR,.1))
 write_asset("paper",add_reverb(pan_mono(filt(noise(1.05),"bandpass",(450,8500))*envelope(nframes(1.05),.015,.24)*.28,-.15,width=.18),ROOM_IR,.08))
 write_asset("page-turn",pan_mono(filt(noise(.62),"bandpass",(700,9200))*envelope(nframes(.62),.008,.28)*.24,.12,width=.21))
-write_asset("item-pickup",tonal_ui([(420,0,.14),(630,.065,.12),(910,.14,.09)],.62,.12))
+pickup=np.zeros((nframes(.72),2)); fabric=filt(noise(.42),"bandpass",(160,2600),3)*envelope(nframes(.42),.04,.18)*.055; place(pickup,.04,fabric,1,pan=.12); place(pickup,.36,thump(.28,84,.08),.12); write_asset("item-pickup",pickup)
 item_place=np.zeros((nframes(.48),2)); place(item_place,0,thump(.48,77,-.08),.58); place(item_place,.12,click(920,.09,pan=.1),.8)
 write_asset("item-place",add_reverb(item_place,ROOM_IR,.11))
 write_asset("place",add_reverb(item_place,ROOM_IR,.11))
-write_asset("inventory-open",tonal_ui([(250,0,.12),(375,.045,.09),(560,.11,.07)],.55,-.12,dark=True))
-write_asset("clue-found",tonal_ui([(392,0,.16),(587,.11,.14),(784,.22,.12),(1175,.34,.08)],1.15,.08))
-write_asset("nerve-drop",tonal_ui([(220,0,.18),(174,.12,.14),(110,.26,.12)],1.0,-.15,dark=True))
-write_asset("danger-rise",add_reverb(pan_mono(oscillator(np.linspace(86,142,nframes(1.2)),1.2)*envelope(nframes(1.2),.08,.28)*.22,0),CORRIDOR_IR,.28))
-write_asset("escape",tonal_ui([(294,0,.12),(440,.1,.13),(587,.22,.13),(880,.38,.11)],1.55,0))
-write_asset("failure",scary_hit()*.82)
-write_asset("achievement",tonal_ui([(330,0,.12),(495,.1,.12),(660,.22,.14),(990,.35,.11),(1320,.5,.07)],1.7,0))
-write_asset("collection-complete",tonal_ui([(262,0,.1),(392,.08,.1),(523,.17,.12),(784,.3,.12),(1046,.48,.08)],1.85,.05))
-write_asset("purchase-stars",tonal_ui([(392,0,.12),(494,.1,.14),(659,.22,.14),(784,.36,.12),(988,.53,.09)],1.55,.05))
-write_asset("purchase",tonal_ui([(392,0,.12),(494,.1,.14),(659,.22,.14),(784,.36,.12),(988,.53,.09)],1.55,.05))
-write_asset("marks",tonal_ui([(740,0,.13),(880,.07,.12),(1110,.16,.09)],.72,.1))
-write_asset("vote",tonal_ui([(280,0,.12),(420,.07,.11)],.5,-.05,dark=True))
-write_asset("message-send",tonal_ui([(520,0,.09),(780,.065,.1),(1040,.13,.07)],.55,.2))
-write_asset("coop-join",tonal_ui([(330,0,.11),(495,.09,.11),(660,.2,.1)],.85,-.2))
-write_asset("coop-ready",tonal_ui([(440,0,.11),(660,.08,.13),(880,.2,.09)],.85,.15))
-write_asset("coop-leave",tonal_ui([(440,0,.11),(294,.11,.11),(196,.24,.09)],.9,-.2,dark=True))
-write_asset("reconnect",tonal_ui([(220,0,.08),(330,.09,.1),(440,.19,.12),(660,.33,.08)],1.05,0))
-write_asset("match-start",tonal_ui([(98,0,.12),(196,.06,.09),(392,.23,.12),(784,.43,.09)],1.45,0,dark=True))
-write_asset("match-end",tonal_ui([(659,0,.12),(494,.15,.11),(330,.32,.1)],1.35,0,dark=True))
-write_asset("spectator-camera",tonal_ui([(2150,0,.22),(1020,.08,.12)],.62,.22,dark=True))
-write_asset("spectator-light",tonal_ui([(90,0,.12),(180,.035,.08),(740,.13,.12)],.9,-.18,dark=True))
-write_asset("radio-short",add_reverb(thump(.17,112,-.3)*.52,ROOM_IR,.18))
-write_asset("radio-long",add_reverb(thump(.36,78,.3)*.62,ROOM_IR,.2))
-write_asset("radio-success",tonal_ui([(247,0,.1),(370,.1,.11),(494,.22,.13),(740,.38,.1)],1.35,0))
-write_asset("radio-fail",tonal_ui([(260,0,.13),(173,.15,.12),(115,.32,.1)],1.15,0,dark=True))
+bag=np.zeros((nframes(.9),2)); zipline=filt(noise(.62),"bandpass",(220,3300),3)*envelope(nframes(.62),.05,.22)*.05; place(bag,.04,zipline,1,pan=-.12); place(bag,.55,thump(.26,76,-.08),.1); write_asset("inventory-open",bag)
+# Physical feedback only: paper, fabric, relays and room pressure. No game stingers.
+clue=np.zeros((nframes(1.45),2)); rustle=filt(noise(.9),"bandpass",(280,5200),3)*envelope(nframes(.9),.04,.38)*.12; place(clue,.06,rustle,1,pan=-.08); place(clue,.72,click(460,.12,pan=.12),.42); write_asset("clue-found",add_reverb(clue,ROOM_IR,.1))
 
-# UI family: understated, tactile, non-gamey.
-for i,(f,p) in enumerate([(1120,-.08),(1280,.04),(980,.1)],1): write_asset(f"ui-tap-{i:02d}",click(f,.055,pan=p)*.72)
-write_asset("ui-primary",tonal_ui([(410,0,.09),(615,.055,.075)],.34,.04,dark=True))
-write_asset("ui-tab",tonal_ui([(520,0,.07),(780,.045,.055)],.28,-.02,dark=True))
-write_asset("ui-back",tonal_ui([(620,0,.07),(410,.06,.06)],.32,-.2,dark=True))
-write_asset("ui-open",tonal_ui([(330,0,.07),(495,.06,.065)],.38,.12,dark=True))
-write_asset("ui-close",tonal_ui([(495,0,.065),(330,.055,.055)],.35,-.12,dark=True))
-write_asset("ui-toggle-on",tonal_ui([(520,0,.07),(780,.06,.07)],.34,.15))
-write_asset("ui-toggle-off",tonal_ui([(520,0,.06),(347,.06,.055)],.34,-.15,dark=True))
-write_asset("ui-slider",click(2050,.026,pan=0)*.42)
-write_asset("ui-success",tonal_ui([(440,0,.09),(660,.09,.11),(880,.2,.08)],.85,.06))
-write_asset("ui-error",tonal_ui([(330,0,.11),(220,.1,.11),(147,.24,.08)],.92,-.08,dark=True))
-write_asset("ui-warning",tonal_ui([(330,0,.09),(330,.18,.07)],.7,0,dark=True))
-write_asset("ui-notification",tonal_ui([(740,0,.08),(990,.08,.075)],.62,.15))
-write_asset("ui-card",tonal_ui([(280,0,.055),(420,.045,.045)],.3,0,dark=True))
-write_asset("ui-disabled",tonal_ui([(155,0,.06)],.28,0,dark=True))
+breath=np.zeros((nframes(2.1),2)); exhale=filt(noise(1.7),"bandpass",(90,1200),3)*envelope(nframes(1.7),.25,.7)*.07; place(breath,.1,exhale,1,pan=-.18); place(breath,.48,thump(.75,48,0),.13); write_asset("nerve-drop",add_reverb(breath,CORRIDOR_IR,.34))
+write_asset("danger-rise",scary_hit()*.58)
+
+escape_sound=np.zeros((nframes(2.7),2)); place(escape_sound,.05,click(430,.12,pan=-.1),.42); air=filt(noise(1.9),"bandpass",(80,1600),3)*envelope(nframes(1.9),.22,.72)*.07; place(escape_sound,.38,air,1,pan=.1); place(escape_sound,1.52,door(True)*.35,.62); write_asset("escape",escape_sound)
+
+failure_sound=np.zeros((nframes(2.8),2)); power=filt(noise(.5),"lowpass",420)*envelope(nframes(.5),.02,.3)*.08; place(failure_sound,.05,power,1); place(failure_sound,.3,scary_hit(),.5); write_asset("failure",failure_sound)
+
+stamp=np.zeros((nframes(.95),2)); place(stamp,.08,thump(.34,74,-.04),.3); place(stamp,.16,click(390,.1,pan=.02),.42); paperbed=filt(noise(.55),"bandpass",(320,3900),3)*envelope(nframes(.55),.02,.28)*.05; place(stamp,.24,paperbed,1,pan=.05); write_asset("achievement",stamp)
+
+binder=np.zeros((nframes(1.3),2)); paperbed=filt(noise(.7),"bandpass",(260,4300),3)*envelope(nframes(.7),.03,.3)*.07; place(binder,.02,paperbed,1,pan=-.1); place(binder,.62,thump(.45,68,.04),.28); write_asset("collection-complete",binder)
+
+receipt=np.zeros((nframes(1.25),2)); roll=filt(noise(.72),"bandpass",(450,3800),3)*envelope(nframes(.72),.04,.24)*.055; place(receipt,.05,roll,1,pan=.08); place(receipt,.72,click(420,.11,pan=-.08),.38); write_asset("purchase-stars",receipt); write_asset("purchase",receipt)
+
+token=np.zeros((nframes(.8),2)); slide=filt(noise(.48),"bandpass",(180,2400),3)*envelope(nframes(.48),.03,.2)*.045; place(token,.03,slide,1,pan=.12); place(token,.4,click(360,.1,pan=.18),.35); write_asset("marks",token)
+
+pencil=np.zeros((nframes(.72),2)); stroke=filt(noise(.55),"bandpass",(420,3200),3)*envelope(nframes(.55),.06,.2)*.045; place(pencil,.05,stroke,1,pan=-.12); write_asset("vote",pencil)
+
+note=np.zeros((nframes(1.05),2)); slide=filt(noise(.8),"bandpass",(280,3800),3)*envelope(nframes(.8),.06,.34)*.06; place(note,.05,slide,1,pan=.2); place(note,.7,thump(.26,82,.25),.12); write_asset("message-send",note)
+
+join=np.zeros((nframes(1.25),2)); place(join,.08,door(True)*.18,.55); place(join,.72,thump(.35,66,-.25),.12); write_asset("coop-join",join)
+ready=np.zeros((nframes(.9),2)); place(ready,.05,click(430,.12,pan=.12),.35); place(ready,.3,thump(.35,62,.05),.12); write_asset("coop-ready",ready)
+leave=np.zeros((nframes(1.25),2)); place(leave,.05,door(False)*.16,.55); write_asset("coop-leave",leave)
+
+reconnect_sound=np.zeros((nframes(1.5),2)); line=filt(noise(1.0),"bandpass",(150,1450),3)*envelope(nframes(1.0),.22,.42)*.035; place(reconnect_sound,.1,line,1); place(reconnect_sound,.82,click(390,.12),.28); write_asset("reconnect",reconnect_sound)
+
+match_start=np.zeros((nframes(2.0),2)); place(match_start,.05,click(420,.13,pan=-.1),.4); place(match_start,.38,door(False)*.25,.65); write_asset("match-start",match_start)
+match_end=np.zeros((nframes(2.1),2)); place(match_end,.05,click(390,.12,pan=.1),.32); place(match_end,.45,door(True)*.27,.68); write_asset("match-end",match_end)
+
+write_asset("spectator-camera",add_reverb(click(470,.13,pan=.22)*.42,ROOM_IR,.12))
+spec_light=np.zeros((nframes(.9),2)); hum=filt(noise(.6),"bandpass",(70,800),3)*envelope(nframes(.6),.12,.25)*.045; place(spec_light,.04,hum,1,pan=-.18); place(spec_light,.42,click(410,.1,pan=-.1),.28); write_asset("spectator-light",spec_light)
+
+write_asset("radio-short",add_reverb(thump(.2,92,-.3)*.3,ROOM_IR,.24))
+write_asset("radio-long",add_reverb(thump(.42,68,.3)*.34,ROOM_IR,.26))
+radio_ok=np.zeros((nframes(1.35),2)); place(radio_ok,.05,click(390,.12),.3); stable=oscillator(118,1.0)*envelope(nframes(1.0),.18,.5)*.045; place(radio_ok,.24,stable,1); write_asset("radio-success",radio_ok)
+radio_bad=np.zeros((nframes(1.35),2)); static=filt(noise(.9),"bandpass",(120,1400),3)*envelope(nframes(.9),.08,.48)*.035; place(radio_bad,.1,static,1); place(radio_bad,.72,click(330,.12),.24); write_asset("radio-fail",radio_bad)
+
+
+# UI interaction sounds intentionally omitted in V4.3.0.
+
 
 # Rare house events.
 def rare(name):
     if name=="wall-scratch":
-        d=2.8;x=filt(noise(d),"bandpass",(900,6200))*envelope(nframes(d),.15,.45)*.12*(.4+.6*np.abs(np.sin(2*np.pi*4.3*time(d)))); return add_reverb(pan_mono(x,.72),CORRIDOR_IR,.35)
+        d=2.8;x=filt(noise(d),"bandpass",(420,3400),3)*envelope(nframes(d),.15,.45)*.12*(.4+.6*np.abs(np.sin(2*np.pi*4.3*time(d)))); return add_reverb(pan_mono(x,.72),CORRIDOR_IR,.35)
     if name=="bulb-flicker":
         out=np.zeros((nframes(1.7),2));
-        for ts in [.02,.18,.43,.92,1.05]: place(out,ts,click(3100,.038,pan=R.uniform(-.2,.2)),.32)
+        for ts in [.02,.18,.43,.92,1.05]: place(out,ts,click(520,.09,pan=R.uniform(-.2,.2)),.32)
         return out
     if name=="water-drip":
         out=np.zeros((nframes(2.3),2));
@@ -487,7 +503,7 @@ def rare(name):
         for ts,p in [(0,-.45),(.42,.42),(.95,-.1)]: place(out,ts,tonal_ui([(160,0,.18),(270,.025,.07)],.42,p,dark=True),.6)
         return add_reverb(out,CORRIDOR_IR,.4)
     if name=="intercom":
-        out=np.zeros((nframes(3.7),2)); place(out,.05,tonal_ui([(690,0,.14),(960,0,.08)],.85,-.2),.65); place(out,1.55,click(2100,.08,pan=.2),.4); return add_reverb(out,CORRIDOR_IR,.28)
+        out=np.zeros((nframes(3.7),2)); place(out,.05,tonal_ui([(690,0,.14),(960,0,.08)],.85,-.2),.65); place(out,1.55,click(480,.12,pan=.2),.4); return add_reverb(out,CORRIDOR_IR,.28)
     raise ValueError(name)
 for n in ["wall-scratch","bulb-flicker","water-drip","distant-door","distant-elevator","pipe-knock","intercom"]: write_asset(n,rare(n),"effect")
 
@@ -499,7 +515,7 @@ for p in sorted(OUT.iterdir()):
     if p.suffix in {".m4a",".wav"}:
         assets.append({"file":p.name,"bytes":p.stat().st_size})
 import json
-(OUT/"manifest.json").write_text(json.dumps({"version":"4.1.0","sampleRate":SR,"original":True,"assets":assets},ensure_ascii=False,indent=2),encoding="utf-8")
+(OUT/"manifest.json").write_text(json.dumps({"version":"4.3.0","sampleRate":SR,"original":True,"assets":assets},ensure_ascii=False,indent=2),encoding="utf-8")
 
 shutil.rmtree(TMP,ignore_errors=True)
 print(f"Generated {len(assets)} files ({sum(a['bytes'] for a in assets)/1024/1024:.1f} MiB) in {OUT}")

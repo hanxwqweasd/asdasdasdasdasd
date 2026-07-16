@@ -1,4 +1,4 @@
-const APP_VERSION = "4.2.0";
+const APP_VERSION = "4.3.0";
 const tg = window.Telegram?.WebApp;
 
 if (tg) {
@@ -111,73 +111,57 @@ function telegramDiagnostics() {
 }
 
 const SOUND_CUES = {
-  uiTap: { assets: ["ui-tap-01", "ui-tap-02", "ui-tap-03"], bus: "ui", volume: 0.34, cooldown: 26, polyphony: 5, rateJitter: 0.025 },
-  uiPrimary: { assets: ["ui-primary"], bus: "ui", volume: 0.54, cooldown: 70, polyphony: 2 },
-  uiTab: { assets: ["ui-tab"], bus: "ui", volume: 0.42, cooldown: 80, polyphony: 2, rateJitter: 0.018 },
-  uiBack: { assets: ["ui-back"], bus: "ui", volume: 0.44, cooldown: 80 },
-  uiOpen: { assets: ["ui-open"], bus: "ui", volume: 0.48, cooldown: 90 },
-  uiClose: { assets: ["ui-close"], bus: "ui", volume: 0.44, cooldown: 90 },
-  uiToggleOn: { assets: ["ui-toggle-on"], bus: "ui", volume: 0.48, cooldown: 70 },
-  uiToggleOff: { assets: ["ui-toggle-off"], bus: "ui", volume: 0.45, cooldown: 70 },
-  uiSlider: { assets: ["ui-slider"], bus: "ui", volume: 0.22, cooldown: 55, polyphony: 1, rateJitter: 0.05 },
-  uiSuccess: { assets: ["ui-success"], bus: "ui", volume: 0.58, cooldown: 260, duck: 0.06 },
-  uiError: { assets: ["ui-error"], bus: "ui", volume: 0.62, cooldown: 260, duck: 0.08 },
-  uiWarning: { assets: ["ui-warning"], bus: "ui", volume: 0.54, cooldown: 220 },
-  uiNotification: { assets: ["ui-notification"], bus: "ui", volume: 0.45, cooldown: 250 },
-  uiCard: { assets: ["ui-card"], bus: "ui", volume: 0.34, cooldown: 80 },
-  uiDisabled: { assets: ["ui-disabled"], bus: "ui", volume: 0.36, cooldown: 120 },
+  elevatorButton: { assets: ["elevator-button"], volume: 0.28, cooldown: 160, reverb: 0.12, softness: 0.55 },
+  elevatorTravel: { assets: ["elevator-travel"], volume: 0.58, cooldown: 900, polyphony: 1, duck: 0.08, reverb: 0.1, softness: 0.34 },
+  elevatorBrake: { assets: ["elevator-brake"], volume: 0.34, cooldown: 650, reverb: 0.2, softness: 0.62 },
+  floorTick: { assets: ["floor-tick-01", "floor-tick-02", "floor-tick-03"], volume: 0.2, cooldown: 130, polyphony: 1, rateJitter: 0.018, reverb: 0.12, softness: 0.66 },
+  elevatorArrive: { assets: ["elevator-arrive"], volume: 0.34, cooldown: 650, duck: 0.04, reverb: 0.22, softness: 0.48 },
+  elevatorBell: { assets: ["elevator-bell"], volume: 0.28, cooldown: 800, reverb: 0.32, softness: 0.55 },
+  doorOpen: { assets: ["door-open"], volume: 0.48, cooldown: 320, duck: 0.04, reverb: 0.34, softness: 0.48 },
+  doorClose: { assets: ["door-close"], volume: 0.44, cooldown: 340, duck: 0.04, reverb: 0.31, softness: 0.55 },
+  doorLock: { assets: ["door-lock"], volume: 0.34, cooldown: 220, reverb: 0.19, softness: 0.58 },
+  keyTurn: { assets: ["key-turn"], volume: 0.34, cooldown: 180, reverb: 0.16, softness: 0.5 },
+  roomShift: { assets: ["room-shift"], volume: 0.42, cooldown: 650, duck: 0.06, reverb: 0.36, softness: 0.46 },
+  dangerHit: { assets: ["danger-hit"], volume: 0.28, cooldown: 900, duck: 0.08, reverb: 0.38, softness: 0.72 },
+  camera: { assets: ["camera"], volume: 0.32, cooldown: 260, reverb: 0.16, softness: 0.42 },
+  paper: { assets: ["paper"], volume: 0.3, cooldown: 170, reverb: 0.1, softness: 0.28 },
+  pageTurn: { assets: ["page-turn"], volume: 0.26, cooldown: 160, reverb: 0.08, softness: 0.3 },
+  itemPickup: { assets: ["item-pickup"], volume: 0.28, cooldown: 180, reverb: 0.08, softness: 0.48 },
+  itemPlace: { assets: ["item-place"], volume: 0.32, cooldown: 190, reverb: 0.12, softness: 0.5 },
+  inventoryOpen: { assets: ["inventory-open"], volume: 0.22, cooldown: 260, reverb: 0.08, softness: 0.58 },
+  clueFound: { assets: ["clue-found"], volume: 0.34, cooldown: 600, duck: 0.03, reverb: 0.2, softness: 0.55 },
+  nerveDrop: { assets: ["nerve-drop"], volume: 0.28, cooldown: 650, reverb: 0.3, softness: 0.72 },
+  dangerRise: { assets: ["danger-rise"], volume: 0.26, cooldown: 650, reverb: 0.34, softness: 0.74 },
+  escape: { assets: ["escape"], volume: 0.32, cooldown: 1200, duck: 0.04, reverb: 0.22, softness: 0.64 },
+  failure: { assets: ["failure"], volume: 0.3, cooldown: 1200, duck: 0.06, reverb: 0.4, softness: 0.78 },
+  achievement: { assets: ["achievement"], volume: 0.28, cooldown: 900, duck: 0.02, reverb: 0.12, softness: 0.5 },
+  collectionComplete: { assets: ["collection-complete"], volume: 0.3, cooldown: 900, duck: 0.02, reverb: 0.14, softness: 0.52 },
+  purchaseStars: { assets: ["purchase-stars"], volume: 0.28, cooldown: 900, duck: 0.02, reverb: 0.12, softness: 0.52 },
+  marks: { assets: ["marks"], volume: 0.24, cooldown: 260, reverb: 0.08, softness: 0.5 },
+  vote: { assets: ["vote"], volume: 0.2, cooldown: 220, reverb: 0.08, softness: 0.55 },
+  messageSend: { assets: ["message-send"], volume: 0.22, cooldown: 240, reverb: 0.08, softness: 0.52 },
+  coopJoin: { assets: ["coop-join"], volume: 0.24, cooldown: 500, reverb: 0.16, softness: 0.58 },
+  coopReady: { assets: ["coop-ready"], volume: 0.24, cooldown: 400, reverb: 0.14, softness: 0.58 },
+  coopLeave: { assets: ["coop-leave"], volume: 0.22, cooldown: 500, reverb: 0.16, softness: 0.62 },
+  reconnect: { assets: ["reconnect"], volume: 0.2, cooldown: 1200, reverb: 0.15, softness: 0.65 },
+  matchStart: { assets: ["match-start"], volume: 0.3, cooldown: 1200, duck: 0.04, reverb: 0.24, softness: 0.62 },
+  matchEnd: { assets: ["match-end"], volume: 0.28, cooldown: 1200, reverb: 0.2, softness: 0.64 },
+  spectatorCamera: { assets: ["spectator-camera"], volume: 0.25, cooldown: 300, reverb: 0.1, softness: 0.5 },
+  spectatorLight: { assets: ["spectator-light"], volume: 0.26, cooldown: 400, reverb: 0.2, softness: 0.62 },
+  radioShort: { assets: ["radio-short"], volume: 0.34, cooldown: 120, reverb: 0.26, softness: 0.45 },
+  radioLong: { assets: ["radio-long"], volume: 0.36, cooldown: 220, reverb: 0.28, softness: 0.46 },
+  radioSuccess: { assets: ["radio-success"], volume: 0.28, cooldown: 900, reverb: 0.16, softness: 0.58 },
+  radioFail: { assets: ["radio-fail"], volume: 0.26, cooldown: 900, reverb: 0.2, softness: 0.68 },
 
-  elevatorButton: { assets: ["elevator-button"], volume: 0.68, cooldown: 120, reverb: 0.08 },
-  elevatorTravel: { assets: ["elevator-travel"], volume: 0.82, cooldown: 700, polyphony: 1, duck: 0.22, reverb: 0.08 },
-  elevatorBrake: { assets: ["elevator-brake"], volume: 0.54, cooldown: 550, reverb: 0.18 },
-  floorTick: { assets: ["floor-tick-01", "floor-tick-02", "floor-tick-03"], volume: 0.43, cooldown: 100, polyphony: 2, rateJitter: 0.025, reverb: 0.08 },
-  elevatorArrive: { assets: ["elevator-arrive"], volume: 0.62, cooldown: 500, duck: 0.12, reverb: 0.18 },
-  elevatorBell: { assets: ["elevator-bell"], volume: 0.56, cooldown: 550, reverb: 0.28 },
-  doorOpen: { assets: ["door-open"], volume: 0.82, cooldown: 240, duck: 0.12, reverb: 0.3 },
-  doorClose: { assets: ["door-close"], volume: 0.78, cooldown: 240, duck: 0.1, reverb: 0.27 },
-  doorLock: { assets: ["door-lock"], volume: 0.6, cooldown: 150, reverb: 0.16 },
-  keyTurn: { assets: ["key-turn"], volume: 0.58, cooldown: 120, reverb: 0.12 },
-  roomShift: { assets: ["room-shift"], volume: 0.76, cooldown: 450, duck: 0.2, reverb: 0.3 },
-  dangerHit: { assets: ["danger-hit"], volume: 0.75, cooldown: 500, duck: 0.3, reverb: 0.35 },
-  camera: { assets: ["camera"], volume: 0.62, cooldown: 180, reverb: 0.12 },
-  paper: { assets: ["paper"], volume: 0.48, cooldown: 120, reverb: 0.07 },
-  pageTurn: { assets: ["page-turn"], volume: 0.42, cooldown: 100, reverb: 0.05 },
-  itemPickup: { assets: ["item-pickup"], volume: 0.5, cooldown: 120 },
-  itemPlace: { assets: ["item-place"], volume: 0.56, cooldown: 130, reverb: 0.09 },
-  inventoryOpen: { assets: ["inventory-open"], volume: 0.45, cooldown: 180 },
-  clueFound: { assets: ["clue-found"], volume: 0.68, cooldown: 400, duck: 0.08, reverb: 0.18 },
-  nerveDrop: { assets: ["nerve-drop"], volume: 0.58, cooldown: 380, reverb: 0.22 },
-  dangerRise: { assets: ["danger-rise"], volume: 0.54, cooldown: 360, reverb: 0.28 },
-  escape: { assets: ["escape"], volume: 0.72, cooldown: 900, duck: 0.2, reverb: 0.18 },
-  failure: { assets: ["failure"], volume: 0.8, cooldown: 900, duck: 0.34, reverb: 0.34 },
-  achievement: { assets: ["achievement"], volume: 0.66, cooldown: 650, duck: 0.12 },
-  collectionComplete: { assets: ["collection-complete"], volume: 0.7, cooldown: 650, duck: 0.12 },
-  purchaseStars: { assets: ["purchase-stars"], volume: 0.72, cooldown: 650, duck: 0.14 },
-  marks: { assets: ["marks"], volume: 0.5, cooldown: 180 },
-  vote: { assets: ["vote"], volume: 0.46, cooldown: 140 },
-  messageSend: { assets: ["message-send"], volume: 0.48, cooldown: 160 },
-  coopJoin: { assets: ["coop-join"], volume: 0.56, cooldown: 350 },
-  coopReady: { assets: ["coop-ready"], volume: 0.56, cooldown: 250 },
-  coopLeave: { assets: ["coop-leave"], volume: 0.52, cooldown: 350 },
-  reconnect: { assets: ["reconnect"], volume: 0.5, cooldown: 750 },
-  matchStart: { assets: ["match-start"], volume: 0.68, cooldown: 900, duck: 0.16, reverb: 0.2 },
-  matchEnd: { assets: ["match-end"], volume: 0.62, cooldown: 900, reverb: 0.16 },
-  spectatorCamera: { assets: ["spectator-camera"], volume: 0.52, cooldown: 200 },
-  spectatorLight: { assets: ["spectator-light"], volume: 0.58, cooldown: 250, reverb: 0.18 },
-  radioShort: { assets: ["radio-short"], volume: 0.55, cooldown: 90, reverb: 0.23 },
-  radioLong: { assets: ["radio-long"], volume: 0.6, cooldown: 180, reverb: 0.25 },
-  radioSuccess: { assets: ["radio-success"], volume: 0.68, cooldown: 600 },
-  radioFail: { assets: ["radio-fail"], volume: 0.6, cooldown: 600 },
-
-  houseFootstep: { assets: ["footsteps-01", "footsteps-02", "footsteps-03"], volume: 0.3, cooldown: 2600, polyphony: 1, panRange: 0.92, rateJitter: 0.035, reverb: 0.38 },
-  houseWhisper: { assets: ["whisper-01", "whisper-02", "whisper-03"], volume: 0.25, cooldown: 4200, polyphony: 1, panRange: 0.95, rateJitter: 0.02, reverb: 0.4 },
-  pipeKnock: { assets: ["pipe-knock"], volume: 0.3, cooldown: 2800, panRange: 0.9, reverb: 0.42 },
-  wallScratch: { assets: ["wall-scratch"], volume: 0.24, cooldown: 5000, panRange: 0.95, reverb: 0.42 },
-  bulbFlicker: { assets: ["bulb-flicker"], volume: 0.3, cooldown: 1800, panRange: 0.28, reverb: 0.16 },
-  waterDrip: { assets: ["water-drip"], volume: 0.25, cooldown: 2600, panRange: 0.9, reverb: 0.48 },
-  distantDoor: { assets: ["distant-door"], volume: 0.22, cooldown: 4200, panRange: 0.85, reverb: 0.44 },
-  distantElevator: { assets: ["distant-elevator"], volume: 0.2, cooldown: 6000, panRange: 0.65, reverb: 0.35 },
-  intercom: { assets: ["intercom"], volume: 0.3, cooldown: 3200, panRange: 0.55, reverb: 0.32 },
+  houseFootstep: { assets: ["footsteps-01", "footsteps-02", "footsteps-03"], volume: 0.2, cooldown: 5200, polyphony: 1, panRange: 0.82, rateJitter: 0.018, reverb: 0.42, distance: 0.72, softness: 0.52 },
+  houseWhisper: { assets: ["whisper-01", "whisper-02", "whisper-03"], volume: 0.12, cooldown: 9000, polyphony: 1, panRange: 0.78, rateJitter: 0.012, reverb: 0.46, distance: 0.78, softness: 0.62 },
+  pipeKnock: { assets: ["pipe-knock"], volume: 0.18, cooldown: 6200, panRange: 0.75, reverb: 0.46, distance: 0.7, softness: 0.58 },
+  wallScratch: { assets: ["wall-scratch"], volume: 0.12, cooldown: 11000, panRange: 0.78, reverb: 0.48, distance: 0.76, softness: 0.7 },
+  bulbFlicker: { assets: ["bulb-flicker"], volume: 0.12, cooldown: 6500, panRange: 0.22, reverb: 0.2, distance: 0.45, softness: 0.7 },
+  waterDrip: { assets: ["water-drip"], volume: 0.14, cooldown: 7000, panRange: 0.72, reverb: 0.52, distance: 0.7, softness: 0.54 },
+  distantDoor: { assets: ["distant-door"], volume: 0.13, cooldown: 9500, panRange: 0.7, reverb: 0.5, distance: 0.82, softness: 0.68 },
+  distantElevator: { assets: ["distant-elevator"], volume: 0.1, cooldown: 14000, panRange: 0.5, reverb: 0.42, distance: 0.88, softness: 0.72 },
+  intercom: { assets: ["intercom"], volume: 0.16, cooldown: 9000, panRange: 0.48, reverb: 0.38, distance: 0.64, softness: 0.62 },
 };
 
 const LEGACY_SOUND_CUES = {
@@ -198,7 +182,6 @@ class HouseAudioEngine {
     this.master = null;
     this.ambienceBus = null;
     this.worldBus = null;
-    this.uiBus = null;
     this.compressor = null;
     this.reverb = null;
     this.reverbReturn = null;
@@ -231,19 +214,17 @@ class HouseAudioEngine {
         this.master = this.context.createGain();
         this.ambienceBus = this.context.createGain();
         this.worldBus = this.context.createGain();
-        this.uiBus = this.context.createGain();
         this.compressor = this.context.createDynamicsCompressor();
-        this.compressor.threshold.value = -17;
-        this.compressor.knee.value = 18;
-        this.compressor.ratio.value = 4.5;
-        this.compressor.attack.value = 0.006;
-        this.compressor.release.value = 0.24;
+        this.compressor.threshold.value = -24;
+        this.compressor.knee.value = 28;
+        this.compressor.ratio.value = 2.4;
+        this.compressor.attack.value = 0.035;
+        this.compressor.release.value = 0.42;
         this.reverb = this.context.createConvolver();
         this.reverbReturn = this.context.createGain();
         this.reverbReturn.gain.value = 0.18;
         this.ambienceBus.connect(this.master);
         this.worldBus.connect(this.compressor);
-        this.uiBus.connect(this.compressor);
         this.reverb.connect(this.reverbReturn);
         this.reverbReturn.connect(this.compressor);
         this.compressor.connect(this.master);
@@ -257,7 +238,6 @@ class HouseAudioEngine {
       if (!this.preloaded) {
         this.preloaded = true;
         void this.preload([
-          "ui-tap-01", "ui-primary", "ui-tab", "ui-open", "ui-close",
           "elevator-button", "elevator-travel", "floor-tick-01", "elevator-arrive",
           "door-open", "room-shift", "camera", "paper", "item-place",
         ]);
@@ -316,7 +296,6 @@ class HouseAudioEngine {
 
   busFor(name) {
     if (name === "ambience") return this.ambienceBus;
-    if (name === "ui") return this.uiBus;
     return this.worldBus;
   }
 
@@ -327,7 +306,6 @@ class HouseAudioEngine {
     if (this.master) this.master.gain.setTargetAtTime(muted ? 0 : 1, now, 0.035);
     if (this.ambienceBus) this.ambienceBus.gain.setTargetAtTime((state.audio.ambience / 100) * (state.audio.night ? 0.8 : 1), now, 0.08);
     if (this.worldBus) this.worldBus.gain.setTargetAtTime((state.audio.effects / 100) * night, now, 0.04);
-    if (this.uiBus) this.uiBus.gain.setTargetAtTime((state.audio.interface / 100) * (state.audio.night ? 0.82 : 1), now, 0.035);
     if (this.reverbReturn) this.reverbReturn.gain.setTargetAtTime(state.audio.spatial ? 0.18 : 0.04, now, 0.12);
     for (const audio of this.fallbackLoops.values()) {
       audio.volume = muted ? 0 : Math.min(1, (state.audio.ambience / 100) * Number(audio.dataset.volume || 1));
@@ -370,6 +348,8 @@ class HouseAudioEngine {
         rate,
         bus: overrides.bus || cue.bus || "world",
         reverb: overrides.reverb ?? cue.reverb ?? 0,
+        softness: overrides.softness ?? cue.softness ?? 0.35,
+        distance: overrides.distance ?? cue.distance ?? 0,
         onEnded: () => this.voices.set(group, Math.max(0, (this.voices.get(group) || 1) - 1)),
       });
     } catch (error) {
@@ -378,18 +358,24 @@ class HouseAudioEngine {
     }
   }
 
-  async playAsset(name, { volume = 1, pan = 0, rate = 1, bus = "world", reverb = 0, onEnded } = {}) {
+  async playAsset(name, { volume = 1, pan = 0, rate = 1, bus = "world", reverb = 0, softness = 0.35, distance = 0, onEnded } = {}) {
     const ready = await this.unlock();
     if (!ready || !this.context) return this.playFallback(name, { volume, bus, onEnded });
     const buffer = await this.load(name);
     if (!buffer) return this.playFallback(name, { volume, bus, onEnded });
     const source = this.context.createBufferSource();
     const gain = this.context.createGain();
+    const tone = this.context.createBiquadFilter();
     const panner = this.context.createStereoPanner?.();
     source.buffer = buffer;
-    source.playbackRate.value = Math.max(0.72, Math.min(1.35, rate));
-    gain.gain.value = Math.max(0, Math.min(1.3, volume));
-    source.connect(gain);
+    source.playbackRate.value = Math.max(0.78, Math.min(1.22, rate));
+    const distanceGain = Math.max(0.24, 1 - Math.max(0, Math.min(1, distance)) * 0.68);
+    gain.gain.value = Math.max(0, Math.min(1, volume * distanceGain));
+    tone.type = "lowpass";
+    tone.frequency.value = Math.max(2200, 12500 - Math.max(0, Math.min(1, softness + distance * 0.5)) * 7600);
+    tone.Q.value = 0.45;
+    source.connect(tone);
+    tone.connect(gain);
     let output = gain;
     if (panner) {
       panner.pan.value = Math.max(-1, Math.min(1, pan));
@@ -399,7 +385,7 @@ class HouseAudioEngine {
     output.connect(this.busFor(bus));
     if (reverb > 0 && this.reverb?.buffer) {
       const send = this.context.createGain();
-      send.gain.value = Math.min(0.7, reverb);
+      send.gain.value = Math.min(0.62, reverb + distance * 0.18);
       output.connect(send);
       send.connect(this.reverb);
     }
@@ -410,7 +396,7 @@ class HouseAudioEngine {
 
   playFallback(name, { volume = 1, bus = "world", onEnded } = {}) {
     const audio = new Audio(`/audio/${name}.m4a`);
-    const level = bus === "ambience" ? state.audio.ambience : bus === "ui" ? state.audio.interface : state.audio.effects;
+    const level = bus === "ambience" ? state.audio.ambience : state.audio.effects;
     audio.volume = state.audio.mute ? 0 : Math.min(1, (level / 100) * volume * (state.audio.night && bus !== "ambience" ? 0.75 : 1));
     const finish = () => onEnded?.();
     audio.addEventListener("ended", finish, { once: true });
@@ -507,11 +493,11 @@ class HouseAudioEngine {
 
   async testSpace() {
     await this.unlock();
-    await this.cue("pipeKnock", { pan: -0.88, volume: 1.05 });
-    await wait(680);
-    await this.cue("houseFootstep", { pan: 0.84, volume: 1.08 });
-    await wait(920);
-    await this.cue("houseWhisper", { pan: -0.72, volume: 0.9 });
+    await this.cue("pipeKnock", { pan: -0.72, volume: 0.68, distance: 0.64 });
+    await wait(1100);
+    await this.cue("houseFootstep", { pan: 0.68, volume: 0.72, distance: 0.7 });
+    await wait(1500);
+    await this.cue("distantDoor", { pan: -0.46, volume: 0.62, distance: 0.82 });
   }
 }
 
@@ -535,9 +521,8 @@ const state = {
   sessionId: sessionStorage.getItem("ef_session") || opId(),
   assignments: {},
   audio: {
-    ambience: Number(localStorage.getItem("ef_ambience") ?? 58),
-    effects: Number(localStorage.getItem("ef_effects") ?? 76),
-    interface: Number(localStorage.getItem("ef_interface") ?? 48),
+    ambience: Number(localStorage.getItem("ef_ambience") ?? 64),
+    effects: Number(localStorage.getItem("ef_effects") ?? 52),
     mute: localStorage.getItem("ef_mute") === "1",
     vibration: localStorage.getItem("ef_vibration") !== "0",
     spatial: localStorage.getItem("ef_spatial") !== "0",
@@ -590,7 +575,6 @@ function setNetworkState(online) {
   const wasOffline = document.body.classList.contains("network-offline");
   document.body.classList.toggle("network-offline", !online);
   networkBanner?.classList.toggle("hidden", online);
-  if (!online && !wasOffline) void audioEngine.cue("uiWarning");
   if (online && wasOffline) void audioEngine.cue("reconnect", { volume: 0.72 });
   if (online && state.base) void bootstrap({ preserveTab: true, quiet: true });
 }
@@ -651,7 +635,7 @@ async function api(path, options = {}) {
   throw lastError;
 }
 
-function toast(text, tone = "neutral", withSound = true) {
+function toast(text, tone = "neutral") {
   const message = String(text || "Дом не ответил");
   toastEl.innerHTML = `<span class="toast-mark" aria-hidden="true">${tone === "success" ? "✓" : tone === "error" ? "!" : tone === "warning" ? "△" : "·"}</span><span class="toast-copy">${esc(message)}</span>`;
   toastEl.dataset.tone = tone;
@@ -659,9 +643,6 @@ function toast(text, tone = "neutral", withSound = true) {
   clearTimeout(toastEl._t);
   const duration = Math.min(7200, Math.max(3200, 2200 + message.length * 34));
   toastEl._t = setTimeout(() => toastEl.classList.remove("show"), duration);
-  if (withSound && tone === "success") void audioEngine.cue("uiSuccess");
-  if (withSound && tone === "warning") void audioEngine.cue("uiWarning");
-  if (withSound && tone === "error") void audioEngine.cue("uiError");
 }
 
 function haptic(type = "light") {
@@ -703,11 +684,11 @@ function scheduleAmbient() {
   const sounds = pools[state.tab] || pools.home;
   state.ambientTimer = setTimeout(() => {
     void audioEngine.cue(sounds[Math.floor(Math.random() * sounds.length)], {
-      volume: 0.72 + Math.random() * 0.34,
+      volume: 0.48 + Math.random() * 0.18,
       pan: Math.random() * 1.8 - 0.9,
     });
     scheduleAmbient();
-  }, 8500 + Math.random() * 19000);
+  }, 22000 + Math.random() * 36000);
 }
 function startHouseAudio() {
   if (state.audio.mute) return;
@@ -818,7 +799,6 @@ function handleTelegramBack() {
   if ($("#sheet")?.open) return closeSheet();
   if (!$("#soundPanel")?.classList.contains("hidden")) {
     $("#soundPanel").classList.add("hidden");
-    void audioEngine.cue("uiClose");
     return;
   }
   if (state.tab !== "home") return setTab("home");
@@ -975,7 +955,6 @@ function renderDailyRibbon() {
 }
 async function setTab(tab) {
   if (!tab || tab === state.tab) return;
-  void audioEngine.cue("uiTab");
   state.previousTab = state.tab;
   state.tab = tab;
   $$("#bottomNav button").forEach((button) =>
@@ -1153,8 +1132,8 @@ function bindSceneInteractions(room, onReveal = () => renderSoloExpedition()) {
     overlay?.classList.add("active");
     $(".listen-copy", overlay)?.replaceChildren(document.createTextNode(action === "listen" ? "Дом отделяет полезный звук от шума…" : "Вы отмечаете детали, которые не совпадают с планом…"));
     haptic("medium");
-    if (action === "listen") void audioEngine.cue(room?.ambience === "radio" ? "intercom" : "houseWhisper", { volume: 0.55, pan: room?.ambience === "voices" ? 0.72 : -0.42 });
-    else void audioEngine.cue("camera", { volume: 0.72, pan: 0.24 });
+    if (action === "listen") void audioEngine.cue(room?.ambience === "radio" ? "intercom" : "houseWhisper", { volume: 0.42, pan: room?.ambience === "voices" ? 0.62 : -0.38, distance: 0.64 });
+    else void audioEngine.cue("camera", { volume: 0.48, pan: 0.24, softness: 0.55 });
     try {
       const endpoint = state.expedition?.status === "active" && state.expedition?.room?.id === room?.id
         ? `/api/expeditions/${state.expedition.id}/observe`
@@ -1314,7 +1293,6 @@ function connectCoop(active = null) {
     });
     state.socket.on("disconnect", () => {
       $("#coopDot")?.classList.add("hidden");
-      void audioEngine.cue("uiWarning", { volume: 0.55 });
     });
     state.socket.on("coop:state", async (data) => {
       const previousRoom = state.coop?.roomIndex;
@@ -2187,7 +2165,6 @@ function renderSettings() {
     <div class="headphone-callout">${icon("headphones")}<div><b>Пространственный звук</b><p>Шаги, лифт и голоса получают направление. Для полной сцены используйте наушники.</p></div></div>
     <label>Окружение <output>${state.audio.ambience}</output><input data-audio="ambience" type="range" min="0" max="100" value="${state.audio.ambience}"></label>
     <label>Игровые действия <output>${state.audio.effects}</output><input data-audio="effects" type="range" min="0" max="100" value="${state.audio.effects}"></label>
-    <label>Интерфейс <output>${state.audio.interface}</output><input data-audio="interface" type="range" min="0" max="100" value="${state.audio.interface}"></label>
     <label class="switch-row"><span>Пространственный звук</span><input data-audio="spatial" type="checkbox" ${state.audio.spatial ? "checked" : ""}></label>
     <label class="switch-row"><span>Редкие звуки дома</span><input data-audio="rare" type="checkbox" ${state.audio.rare ? "checked" : ""}></label>
     <label class="switch-row"><span>Ночной режим громкости</span><input data-audio="night" type="checkbox" ${state.audio.night ? "checked" : ""}></label>
@@ -2569,14 +2546,12 @@ function openSheet(title, kicker, html) {
   $("#sheetKicker").textContent = kicker;
   $("#sheetBody").innerHTML = html;
   $("#sheet").showModal();
-  void audioEngine.cue("uiOpen");
   updateTelegramNavigation();
   haptic();
 }
 function closeSheet() {
   if ($("#sheet").open) {
     $("#sheet").close();
-    void audioEngine.cue("uiClose");
   }
   updateTelegramNavigation();
 }
@@ -2598,18 +2573,15 @@ $("#bottomNav").onclick = (event) => {
 $("#soundButton").onclick = () => {
   const opening = $("#soundPanel").classList.contains("hidden");
   $("#soundPanel").classList.toggle("hidden");
-  void audioEngine.cue(opening ? "uiOpen" : "uiClose");
   startHouseAudio();
   updateTelegramNavigation();
 };
 $("#soundClose").onclick = () => {
   $("#soundPanel").classList.add("hidden");
-  void audioEngine.cue("uiClose");
   updateTelegramNavigation();
 };
 $("#ambienceVolume").value = state.audio.ambience;
 $("#effectsVolume").value = state.audio.effects;
-$("#interfaceVolume").value = state.audio.interface;
 $("#muteToggle").checked = state.audio.mute;
 $("#vibrationToggle").checked = state.audio.vibration;
 $("#spatialToggle").checked = state.audio.spatial;
@@ -2618,7 +2590,6 @@ $("#nightToggle").checked = state.audio.night;
 $("#motionToggle").checked = state.motionReduced;
 $("#ambienceValue").textContent = state.audio.ambience;
 $("#effectsValue").textContent = state.audio.effects;
-$("#interfaceValue").textContent = state.audio.interface;
 $("#soundIconUse")?.setAttribute(
   "href",
   `/assets/icons.svg#${state.audio.mute ? "mute" : "sound"}`,
@@ -2630,10 +2601,6 @@ $("#ambienceVolume").oninput = (event) => {
 $("#effectsVolume").oninput = (event) => {
   $("#effectsValue").textContent = event.target.value;
   updateAudio("effects", Number(event.target.value));
-};
-$("#interfaceVolume").oninput = (event) => {
-  $("#interfaceValue").textContent = event.target.value;
-  updateAudio("interface", Number(event.target.value));
 };
 $("#spatialToggle").onchange = (event) => updateAudio("spatial", event.target.checked);
 $("#rareToggle").onchange = (event) => updateAudio("rare", event.target.checked);
@@ -2648,47 +2615,6 @@ $("#motionToggle").onchange = (event) => {
   document.body.classList.toggle("reduce-motion", state.motionReduced);
 };
 $("#audioTest").onclick = () => audioEngine.testSpace();
-
-let lastSliderSoundAt = 0;
-function interactionCueFor(element) {
-  if (!element) return null;
-  if (element.disabled || element.getAttribute("aria-disabled") === "true") return "uiDisabled";
-  if (element.dataset.sound) return element.dataset.sound;
-  if (element.matches("[data-tab]")) return null;
-  if (element.matches("[data-storage='withdraw'], [data-item-action='take']")) return "itemPickup";
-  if (element.matches("[data-storage='deposit'], [data-place], [data-interior]")) return "itemPlace";
-  if (element.matches("[data-vote], [data-coop-vote]")) return "vote";
-  if (element.matches("[data-daily-action], [data-story], [data-restore]")) return "paper";
-  if (element.matches("[data-gift], [data-send], [data-building='post']")) return "messageSend";
-  if (element.matches("[data-scene-look]")) return "camera";
-  if (element.matches("[data-scene-listen]")) return "uiCard";
-  if (element.classList.contains("danger")) return "uiWarning";
-  if (element.classList.contains("primary")) return "uiPrimary";
-  if (element.matches(".choice-button, .story-card, .market-item, .storage-item")) return "uiCard";
-  if (element.matches("#sheetClose, #soundClose")) return null;
-  return "uiTap";
-}
-
-document.addEventListener("pointerdown", (event) => {
-  startHouseAudio();
-  const element = event.target.closest("button, a, [role='button'], .choice-button, .market-item, .storage-item");
-  const cue = interactionCueFor(element);
-  if (cue) void audioEngine.cue(cue);
-}, { capture: true });
-
-document.addEventListener("change", (event) => {
-  if (event.target.matches("input[type='checkbox']"))
-    void audioEngine.cue(event.target.checked ? "uiToggleOn" : "uiToggleOff");
-  else if (event.target.matches("select")) void audioEngine.cue("uiCard");
-});
-
-document.addEventListener("input", (event) => {
-  if (!event.target.matches("input[type='range']")) return;
-  const now = performance.now();
-  if (now - lastSliderSoundAt < 65) return;
-  lastSliderSoundAt = now;
-  void audioEngine.cue("uiSlider", { rate: 0.88 + Number(event.target.value || 0) / 420 });
-});
 
 document.addEventListener("pointerdown", () => startHouseAudio(), { once: true });
 document.addEventListener("visibilitychange", () => {

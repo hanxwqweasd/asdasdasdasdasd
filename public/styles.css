@@ -2924,3 +2924,10 @@ button:not(.round-button):not(.house-seal):not(.bottom-nav button):not(.scene-to
   opacity: .75;
   pointer-events: none;
 }
+
+.sound-note {
+  margin: -2px 0 4px;
+  color: rgba(241, 232, 219, 0.68);
+  font-size: 0.78rem;
+  line-height: 1.45;
+}

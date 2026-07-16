@@ -1,55 +1,55 @@
 {
-  "version": "4.2.0",
+  "version": "4.3.0",
   "sampleRate": 48000,
   "original": true,
   "assets": [
     {
       "file": "achievement.m4a",
-      "bytes": 34916
+      "bytes": 17075
     },
     {
       "file": "apartment-night.m4a",
-      "bytes": 881985
+      "bytes": 878642
     },
     {
       "file": "archive-room.m4a",
-      "bytes": 766980
+      "bytes": 766506
     },
     {
       "file": "building-hall.m4a",
-      "bytes": 802737
+      "bytes": 803044
     },
     {
       "file": "bulb-flicker.m4a",
-      "bytes": 16038
+      "bytes": 22533
     },
     {
       "file": "camera.m4a",
-      "bytes": 15261
+      "bytes": 16631
     },
     {
       "file": "clue-found.m4a",
-      "bytes": 23781
+      "bytes": 30561
     },
     {
       "file": "collection-complete.m4a",
-      "bytes": 37587
+      "bytes": 23778
     },
     {
       "file": "coop-join.m4a",
-      "bytes": 17805
+      "bytes": 27398
     },
     {
       "file": "coop-leave.m4a",
-      "bytes": 18765
+      "bytes": 27493
     },
     {
       "file": "coop-ready.m4a",
-      "bytes": 17788
+      "bytes": 15474
     },
     {
       "file": "coop-tension.m4a",
-      "bytes": 767478
+      "bytes": 765781
     },
     {
       "file": "corridor-ir.wav",
@@ -57,211 +57,211 @@
     },
     {
       "file": "danger-hit.m4a",
-      "bytes": 37107
+      "bytes": 49161
     },
     {
       "file": "danger-rise.m4a",
-      "bytes": 25748
+      "bytes": 49227
     },
     {
       "file": "distant-door.m4a",
-      "bytes": 31935
+      "bytes": 32008
     },
     {
       "file": "distant-elevator.m4a",
-      "bytes": 97799
+      "bytes": 97671
     },
     {
       "file": "door-close.m4a",
-      "bytes": 31964
+      "bytes": 32011
     },
     {
       "file": "door-lock.m4a",
-      "bytes": 14752
+      "bytes": 4522
     },
     {
       "file": "door-open.m4a",
-      "bytes": 44004
+      "bytes": 43978
     },
     {
       "file": "door.m4a",
-      "bytes": 44030
+      "bytes": 44070
     },
     {
       "file": "eighth-floor.m4a",
-      "bytes": 841240
+      "bytes": 838863
     },
     {
       "file": "elevator-arrive.m4a",
-      "bytes": 33192
+      "bytes": 41000
     },
     {
       "file": "elevator-bell.m4a",
-      "bytes": 40333
+      "bytes": 53133
     },
     {
       "file": "elevator-brake.m4a",
-      "bytes": 17964
+      "bytes": 28628
     },
     {
       "file": "elevator-button.m4a",
-      "bytes": 3650
+      "bytes": 4027
     },
     {
       "file": "elevator-travel.m4a",
-      "bytes": 97412
+      "bytes": 97497
     },
     {
       "file": "elevator.m4a",
-      "bytes": 98023
+      "bytes": 97451
     },
     {
       "file": "escape.m4a",
-      "bytes": 31931
+      "bytes": 55223
     },
     {
       "file": "failure.m4a",
-      "bytes": 37601
+      "bytes": 56241
     },
     {
       "file": "floor-ambience.m4a",
-      "bytes": 841240
+      "bytes": 838863
     },
     {
       "file": "floor-tick-01.m4a",
-      "bytes": 2774
+      "bytes": 3261
     },
     {
       "file": "floor-tick-02.m4a",
-      "bytes": 2773
+      "bytes": 3235
     },
     {
       "file": "floor-tick-03.m4a",
-      "bytes": 2766
+      "bytes": 3446
     },
     {
       "file": "footsteps-01.m4a",
-      "bytes": 109600
+      "bytes": 107295
     },
     {
       "file": "footsteps-02.m4a",
-      "bytes": 108615
+      "bytes": 109404
     },
     {
       "file": "footsteps-03.m4a",
-      "bytes": 109171
+      "bytes": 107441
     },
     {
       "file": "footsteps.m4a",
-      "bytes": 109506
+      "bytes": 108777
     },
     {
       "file": "impact.m4a",
-      "bytes": 37536
+      "bytes": 49189
     },
     {
       "file": "intercom.m4a",
-      "bytes": 77868
+      "bytes": 77503
     },
     {
       "file": "inventory-open.m4a",
-      "bytes": 11811
+      "bytes": 18250
     },
     {
       "file": "item-pickup.m4a",
-      "bytes": 13084
+      "bytes": 14862
     },
     {
       "file": "item-place.m4a",
-      "bytes": 10333
+      "bytes": 10397
     },
     {
       "file": "key-turn.m4a",
-      "bytes": 4241
+      "bytes": 15896
     },
     {
       "file": "lamp-hum.m4a",
-      "bytes": 399284
+      "bytes": 398814
     },
     {
       "file": "market-lobby.m4a",
-      "bytes": 730104
+      "bytes": 729385
     },
     {
       "file": "marks.m4a",
-      "bytes": 15273
+      "bytes": 13525
     },
     {
       "file": "match-end.m4a",
-      "bytes": 28015
+      "bytes": 41977
     },
     {
       "file": "match-start.m4a",
-      "bytes": 29842
+      "bytes": 40283
     },
     {
       "file": "message-send.m4a",
-      "bytes": 11882
+      "bytes": 20973
     },
     {
       "file": "neighbor.m4a",
-      "bytes": 314598
+      "bytes": 310277
     },
     {
       "file": "nerve-drop.m4a",
-      "bytes": 20751
+      "bytes": 43760
     },
     {
       "file": "page-turn.m4a",
-      "bytes": 13611
+      "bytes": 13683
     },
     {
       "file": "paper.m4a",
-      "bytes": 21653
+      "bytes": 21854
     },
     {
       "file": "pipe-knock.m4a",
-      "bytes": 36835
+      "bytes": 36855
     },
     {
       "file": "pipes.m4a",
-      "bytes": 342125
+      "bytes": 342248
     },
     {
       "file": "place.m4a",
-      "bytes": 10333
+      "bytes": 10397
     },
     {
       "file": "purchase-stars.m4a",
-      "bytes": 31977
+      "bytes": 20042
     },
     {
       "file": "purchase.m4a",
-      "bytes": 31977
+      "bytes": 20042
     },
     {
       "file": "radio-fail.m4a",
-      "bytes": 23823
+      "bytes": 20494
     },
     {
       "file": "radio-long.m4a",
-      "bytes": 8125
+      "bytes": 9328
     },
     {
       "file": "radio-short.m4a",
-      "bytes": 4173
+      "bytes": 4588
     },
     {
       "file": "radio-success.m4a",
-      "bytes": 27986
+      "bytes": 20772
     },
     {
       "file": "rain-window.m4a",
-      "bytes": 881985
+      "bytes": 878642
     },
     {
       "file": "reconnect.m4a",
-      "bytes": 21669
+      "bytes": 22083
     },
     {
       "file": "room-ir.wav",
@@ -269,131 +269,63 @@
     },
     {
       "file": "room-shift.m4a",
-      "bytes": 55744
+      "bytes": 77775
     },
     {
       "file": "room.m4a",
-      "bytes": 55914
+      "bytes": 77459
     },
     {
       "file": "spectator-camera.m4a",
-      "bytes": 13208
+      "bytes": 4061
     },
     {
       "file": "spectator-light.m4a",
-      "bytes": 18762
+      "bytes": 14665
     },
     {
       "file": "television.m4a",
-      "bytes": 313501
+      "bytes": 313773
     },
     {
       "file": "tension-high.m4a",
-      "bytes": 584859
+      "bytes": 584444
     },
     {
       "file": "tension-low.m4a",
-      "bytes": 583934
-    },
-    {
-      "file": "ui-back.m4a",
-      "bytes": 7125
-    },
-    {
-      "file": "ui-card.m4a",
-      "bytes": 6746
-    },
-    {
-      "file": "ui-close.m4a",
-      "bytes": 7636
-    },
-    {
-      "file": "ui-disabled.m4a",
-      "bytes": 6365
-    },
-    {
-      "file": "ui-error.m4a",
-      "bytes": 19420
-    },
-    {
-      "file": "ui-notification.m4a",
-      "bytes": 13099
-    },
-    {
-      "file": "ui-open.m4a",
-      "bytes": 8408
-    },
-    {
-      "file": "ui-primary.m4a",
-      "bytes": 7403
-    },
-    {
-      "file": "ui-slider.m4a",
-      "bytes": 1491
-    },
-    {
-      "file": "ui-success.m4a",
-      "bytes": 17809
-    },
-    {
-      "file": "ui-tab.m4a",
-      "bytes": 6375
-    },
-    {
-      "file": "ui-tap-01.m4a",
-      "bytes": 2089
-    },
-    {
-      "file": "ui-tap-02.m4a",
-      "bytes": 2021
-    },
-    {
-      "file": "ui-tap-03.m4a",
-      "bytes": 2049
-    },
-    {
-      "file": "ui-toggle-off.m4a",
-      "bytes": 7563
-    },
-    {
-      "file": "ui-toggle-on.m4a",
-      "bytes": 7556
-    },
-    {
-      "file": "ui-warning.m4a",
-      "bytes": 14771
+      "bytes": 583346
     },
     {
       "file": "vote.m4a",
-      "bytes": 10953
+      "bytes": 13412
     },
     {
       "file": "wall-scratch.m4a",
-      "bytes": 57548
+      "bytes": 57415
     },
     {
       "file": "water-drip.m4a",
-      "bytes": 47812
+      "bytes": 47697
     },
     {
       "file": "whisper-01.m4a",
-      "bytes": 72333
+      "bytes": 71840
     },
     {
       "file": "whisper-02.m4a",
-      "bytes": 72053
+      "bytes": 71681
     },
     {
       "file": "whisper-03.m4a",
-      "bytes": 72283
+      "bytes": 71689
     },
     {
       "file": "whisper.m4a",
-      "bytes": 72455
+      "bytes": 71762
     },
     {
       "file": "wind.m4a",
-      "bytes": 398352
+      "bytes": 398482
     }
   ]
 }

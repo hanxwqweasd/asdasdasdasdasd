@@ -19,13 +19,15 @@ test("final client shell exposes app identity and Telegram-safe assets", async (
   assert.match(html, /manifest\.webmanifest/);
   assert.match(html, /id="bootScene"/);
   assert.match(html, /floorTransition/);
-  assert.match(app, /const APP_VERSION = "4\.2\.0"/);
+  assert.doesNotMatch(html, /ui-tap-01/);
+  assert.match(html, /Интерфейс бесшумен/);
+  assert.match(app, /const APP_VERSION = "4\.3\.0"/);
   assert.match(app, /class HouseAudioEngine/);
   assert.match(manifest, /Восьмого этажа нет/);
   assert.match(icons, /symbol id="elevator"/);
 });
 
-test("cinematic audio pack contains high-quality spatial layers and tactile cues", async () => {
+test("naturalistic audio pack contains spatial room layers without interface clicks", async () => {
   const required = [
     "public/audio/elevator-travel.m4a",
     "public/audio/door-open.m4a",
@@ -33,25 +35,28 @@ test("cinematic audio pack contains high-quality spatial layers and tactile cues
     "public/audio/apartment-night.m4a",
     "public/audio/footsteps-01.m4a",
     "public/audio/whisper-01.m4a",
-    "public/audio/ui-tap-01.m4a",
     "public/audio/purchase-stars.m4a",
     "public/audio/corridor-ir.wav",
     "public/audio/manifest.json",
   ];
   for (const file of required) {
     const info = await stat(path.join(root, file));
-    assert.ok(info.size > (file.includes("ui-tap") ? 1_200 : 4_000), `${file} is unexpectedly small`);
+    assert.ok(info.size > 4_000, `${file} is unexpectedly small`);
   }
   const [manifest, app]=await Promise.all([
     text("public/audio/manifest.json").then(JSON.parse),
     text("public/app.js"),
   ]);
-  assert.equal(manifest.version,"4.2.0");
+  assert.equal(manifest.version,"4.3.0");
   assert.equal(manifest.sampleRate,48_000);
-  assert.ok(manifest.assets.length >= 90);
+  assert.ok(manifest.assets.length >= 78);
   assert.match(app, /const SOUND_CUES/);
   assert.match(app, /reverbReturn/);
+  assert.match(app, /softness/);
+  assert.match(app, /distance/);
   assert.match(app, /setTension/);
+  await assert.rejects(stat(path.join(root, "public/audio/ui-tap-01.m4a")));
+  assert.doesNotMatch(app, /uiTap|uiPrimary|uiTab|uiSlider|interactionCueFor/);
 });
 
 test("every declared cue and adaptive scene layer has a packaged audio asset", async () => {
@@ -66,13 +71,14 @@ test("every declared cue and adaptive scene layer has a packaged audio asset", a
     "eighth-floor", "building-hall", "neighbor", "archive-room",
     "market-lobby", "wind", "tension-low", "tension-high",
   ]) names.add(name);
-  assert.ok(names.size >= 75);
+  assert.ok(names.size >= 60);
   for (const name of names) {
     const info = await stat(path.join(root, `public/audio/${name}.m4a`));
     assert.ok(info.size > 1_000, `missing or empty audio cue: ${name}`);
   }
-  assert.match(app, /document\.addEventListener\("pointerdown"/);
-  assert.match(app, /input\[type='range'\]/);
-  assert.match(app, /interactionCueFor/);
+  assert.match(app, /document\.addEventListener\("pointerdown", \(\) => startHouseAudio\(\), \{ once: true \}\)/);
+  assert.doesNotMatch(app, /document\.addEventListener\("change"[\s\S]{0,180}audioEngine\.cue/);
+  assert.doesNotMatch(app, /document\.addEventListener\("input"[\s\S]{0,180}audioEngine\.cue/);
+  assert.match(app, /22000 \+ Math\.random\(\) \* 36000/);
   assert.match(app, /setTension\(state\.expedition\.state\.danger\)/);
 });

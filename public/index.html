@@ -13,8 +13,7 @@
   <link rel="manifest" href="/manifest.webmanifest">
   <link rel="icon" type="image/png" sizes="192x192" href="/icons/icon-192.png">
   <link rel="preload" href="/audio/apartment-night.m4a" as="audio" type="audio/mp4">
-  <link rel="preload" href="/audio/ui-tap-01.m4a" as="audio" type="audio/mp4">
-  <link rel="stylesheet" href="/styles.css?v=4.2.0">
+  <link rel="stylesheet" href="/styles.css?v=4.3.0">
   <script src="https://telegram.org/js/telegram-web-app.js?66"></script>
   <script src="/socket.io/socket.io.js"></script>
 </head>
@@ -110,12 +109,12 @@
   </dialog>
 
   <aside id="soundPanel" class="sound-panel hidden" aria-label="Настройки звука">
-    <header><div><small>АУДИО ДОМА · 48 КГЦ</small><h3>Слышать стены</h3></div><button id="soundClose" class="round-button" aria-label="Закрыть"><svg class="ui-icon"><use href="/assets/icons.svg#close"></use></svg></button></header>
+    <header><div><small>ЕСТЕСТВЕННЫЙ ЗВУК · 48 КГЦ</small><h3>Слышать стены</h3></div><button id="soundClose" class="round-button" aria-label="Закрыть"><svg class="ui-icon"><use href="/assets/icons.svg#close"></use></svg></button></header>
     <div class="headphone-callout"><svg class="ui-icon"><use href="/assets/icons.svg#headphones"></use></svg><div><b>Сцена рассчитана на наушники</b><p>Шаги, стуки и голоса имеют направление, дистанцию и отражение коридора.</p></div></div>
-    <div class="sound-quality"><span>ORIGINAL AUDIO</span><b>AAC · 48 kHz · spatial mix</b></div>
-    <label>Окружение <output id="ambienceValue">58</output><input id="ambienceVolume" type="range" min="0" max="100" value="58"></label>
-    <label>Игровые действия <output id="effectsValue">76</output><input id="effectsVolume" type="range" min="0" max="100" value="76"></label>
-    <label>Интерфейс <output id="interfaceValue">48</output><input id="interfaceVolume" type="range" min="0" max="100" value="48"></label>
+    <div class="sound-quality"><span>REAL ROOM AUDIO</span><b>мягкий диапазон · пространственная сцена</b></div>
+    <p class="sound-note">Интерфейс бесшумен. Звучат только действия внутри дома и сама среда.</p>
+    <label>Окружение <output id="ambienceValue">64</output><input id="ambienceVolume" type="range" min="0" max="100" value="64"></label>
+    <label>Игровые действия <output id="effectsValue">52</output><input id="effectsVolume" type="range" min="0" max="100" value="52"></label>
     <label class="switch-row"><span>Пространственный звук</span><input id="spatialToggle" type="checkbox" checked></label>
     <label class="switch-row"><span>Редкие звуки дома</span><input id="rareToggle" type="checkbox" checked></label>
     <label class="switch-row"><span>Ночной режим громкости</span><input id="nightToggle" type="checkbox"></label>
@@ -128,6 +127,6 @@
   <div id="networkBanner" class="network-banner hidden"><svg class="ui-icon"><use href="/assets/icons.svg#warning"></use></svg><span>Связь с домом прервана. Действия будут повторены после восстановления.</span></div>
   <div id="toast" class="toast" role="status"></div>
 
-  <script type="module" src="/app.js?v=4.2.0"></script>
+  <script type="module" src="/app.js?v=4.3.0"></script>
 </body>
 </html>

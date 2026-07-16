@@ -1,21 +1,33 @@
-# Cinematic audio system 4.1.0
+# Natural room audio system 4.3.0
 
-The release contains an original procedural 48 kHz stereo sound pack. No external samples are used.
+The release uses an original procedural 48 kHz stereo sound pack. No external recordings or samples are bundled.
+
+## Design rules
+
+- ordinary buttons, tabs, sheets, switches and sliders are completely silent;
+- sound is emitted only by a physical event in the game world;
+- no jump-scare hits or bright reward jingles;
+- mechanical sounds have headroom and softened high frequencies;
+- distant events lose high frequencies and gain room reflections;
+- rare sounds use long, irregular pauses instead of constant noise;
+- important actions briefly lower ambience by only a small amount;
+- the default effects level is deliberately conservative for phone speakers.
 
 ## Mix architecture
 
-- independent ambience, world-action and interface buses;
-- dynamics compression and automatic ambience ducking;
+- separate ambience and world-action buses;
+- gentle compressor with a slow attack and release;
+- per-event low-pass filtering based on softness and distance;
 - convolution reverb using original corridor and room impulse responses;
 - spatial panning that can be disabled;
-- per-cue cooldowns, polyphony limits and subtle pitch variation;
-- adaptive low/high tension layers for expeditions;
+- per-cue cooldowns and strict polyphony limits;
+- adaptive low/high tension beds without sudden stingers;
 - scene crossfades and random loop offsets;
 - AAC/M4A assets for Telegram Android and iOS WebViews.
 
-## Coverage
+## Audible events
 
-Sounds are attached to navigation, buttons, sheets, switches, sliders, messages, voting, inventory, item placement, clues, stat changes, purchases, radio ritual, solo expeditions, spectator actions, reconnection and cooperative matches. Rare environmental events are scheduled separately and can be disabled.
+The player hears the elevator motor, relays, brakes, doors, locks, keys, paper, objects, footsteps, pipes, water, walls, intercom, room movement and radio hardware. Interface navigation remains silent.
 
 ## Regeneration
 
@@ -23,4 +35,4 @@ Sounds are attached to navigation, buttons, sheets, switches, sliders, messages,
 python3 scripts/generate-audio.py
 ```
 
-The generator uses only NumPy/SciPy synthesis and FFmpeg encoding.
+The generator uses NumPy/SciPy acoustic modelling and FFmpeg encoding.
