@@ -1,6 +1,6 @@
 {
   "name": "eighth-floor-telegram-miniapp",
-  "version": "4.3.0",
+  "version": "4.3.1",
   "private": true,
   "type": "module",
   "engines": {
@@ -41,5 +41,8 @@
     "socket.io-client": "^4.8.3",
     "tsx": "^4.19.4",
     "typescript": "^5.8.3"
+  },
+  "overrides": {
+    "thread-stream": "4.2.0"
   }
 }

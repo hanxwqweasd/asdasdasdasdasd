@@ -124,7 +124,7 @@ const schema = z.object({
   SENTRY_TRACES_SAMPLE_RATE: z.coerce.number().min(0).max(1).default(0.1),
   ENABLE_METRICS: bool(true),
   METRICS_TOKEN: z.string().min(16).optional(),
-  APP_VERSION: z.string().default("4.3.0"),
+  APP_VERSION: z.string().default("4.3.1"),
   BACKUP_ENABLED: bool(false),
   BACKUP_DIR: z.string().default("/backups"),
   BACKUP_RETENTION_DAYS: z.coerce.number().int().min(2).max(365).default(14),

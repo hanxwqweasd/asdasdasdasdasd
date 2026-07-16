@@ -1,4 +1,4 @@
-const APP_VERSION = "4.3.0";
+const APP_VERSION = "4.3.1";
 const tg = window.Telegram?.WebApp;
 
 if (tg) {

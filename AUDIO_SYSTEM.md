@@ -1,4 +1,4 @@
-# Natural room audio system 4.3.0
+# Natural room audio system 4.3.1
 
 The release uses an original procedural 48 kHz stereo sound pack. No external recordings or samples are bundled.
 
