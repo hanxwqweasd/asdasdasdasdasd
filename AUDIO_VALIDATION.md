@@ -1,4 +1,4 @@
-# Audio validation 4.3.1
+# Audio validation 4.3.2
 
 - 79 M4A assets decoded successfully;
 - codec: AAC;

@@ -45,9 +45,9 @@ function requestIdentity(request:any):string{
   }
   return `ip:${request.ip}`;
 }
-await app.register(rateLimit,{max:config.RATE_LIMIT_MAX,timeWindow:'1 minute',keyGenerator:requestIdentity});
+await app.register(rateLimit,{max:config.RATE_LIMIT_MAX,timeWindow:'1 minute',keyGenerator:requestIdentity,allowList:(request)=>request.url.startsWith('/health')||request.url.startsWith('/ready')||request.url.startsWith('/api/public-status')||request.url.startsWith('/api/public-config')||request.url.startsWith('/telegram/webhook')});
 
-app.addHook('onRequest',async request=>{(request as any).startedAt=process.hrtime.bigint();if(request.url.startsWith('/health')||request.url.startsWith('/metrics')||request.url.startsWith('/telegram/webhook'))return;const redis=await getRedis();if(redis){const bucket=Math.floor(Date.now()/60_000);const key=`http-limit:${requestIdentity(request)}:${bucket}`;const count=await redis.incr(key);if(count===1)await redis.expire(key,70);if(count>config.RATE_LIMIT_MAX)throw new AppError('Слишком много запросов',429,'DISTRIBUTED_RATE_LIMIT');}});
+app.addHook('onRequest',async request=>{(request as any).startedAt=process.hrtime.bigint();if(!request.url.startsWith('/api/')||request.url.startsWith('/api/public-status')||request.url.startsWith('/api/public-config'))return;try{const redis=await getRedis();if(redis){const bucket=Math.floor(Date.now()/60_000);const key=`http-limit:${requestIdentity(request)}:${bucket}`;const count=await redis.incr(key);if(count===1)await redis.expire(key,70);if(count>config.RATE_LIMIT_MAX)throw new AppError('Слишком много запросов',429,'DISTRIBUTED_RATE_LIMIT');}}catch(error){if(error instanceof AppError)throw error;request.log.warn({error},'Distributed rate limit unavailable; continuing with local limiter');}});
 app.addHook('onResponse',async(request,reply)=>{const started=(request as any).startedAt as bigint|undefined;if(started){const seconds=Number(process.hrtime.bigint()-started)/1e9;httpDuration.observe({method:request.method,route:request.routeOptions?.url??'unknown',status:String(reply.statusCode)},seconds);}});
 app.addHook('preHandler',async request=>{
   if(config.DATABASE_URL&&request.url.startsWith('/api/')&&!request.url.startsWith('/api/public-status')&&!request.url.startsWith('/api/public-config')){
@@ -93,7 +93,9 @@ app.get('/ready',async(_request,reply)=>{await pool.query('SELECT 1');const redi
 app.get('/setup/redis',async(_request,reply)=>{const diagnostic=redisDiagnostic();const redisKeys=['REDIS_URL','REDIS_PRIVATE_URL','REDIS_PUBLIC_URL','REDIS_TLS_URL','REDIS_URI','REDIS_CONNECTION_STRING','REDISHOST','REDISPORT','REDISUSER','REDISPASSWORD','REDIS_HOST','REDIS_PORT','REDIS_USER','REDIS_PASSWORD'];const present=redisKeys.filter(key=>typeof process.env[key]==='string'&&process.env[key]!.trim().length>0);return reply.type('text/html; charset=utf-8').send(`<!doctype html><html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Настройка Redis</title><style>body{margin:0;background:#0b0d0e;color:#eee;font:16px system-ui;display:grid;place-items:center;min-height:100vh}.card{max-width:760px;margin:24px;padding:28px;background:#17191a;border:1px solid #35312b;border-radius:16px;box-shadow:0 22px 80px #0008}h1{font-size:28px}code,pre{background:#08090a;border:1px solid #302d28;border-radius:8px;padding:3px 7px;color:#d8c39d}pre{padding:14px;overflow:auto}.bad{color:#ff9a86}.ok{color:#9dd7aa}li{margin:8px 0}</style></head><body><main class="card"><h1>Redis ${diagnostic.connected?'подключён':'не подключён'}</h1><p class="${diagnostic.connected?'ok':'bad'}">Основной сервер работает. Без Redis временно выключены realtime-кооператив, matchmaking и распределённое присутствие.</p><ol><li>Добавьте Redis в то же Railway-окружение.</li><li>Сервис игры → Variables → Add Reference Variable.</li><li>Выберите Redis → REDIS_URL.</li><li>Создайте новый Deploy.</li></ol><pre>REDIS_URL=\${{Redis.REDIS_URL}}</pre><p>Обнаруженные переменные: <code>${present.length?present.join(', '):'нет'}</code></p><p>Последняя ошибка: <code>${diagnostic.lastError??'нет'}</code></p><p>Проверка: <code>/health</code></p></main></body></html>`);});
 app.get('/metrics',async(request,reply)=>{if(!config.ENABLE_METRICS)return reply.code(404).send();if(config.METRICS_TOKEN&&request.headers.authorization!==`Bearer ${config.METRICS_TOKEN}`)return reply.code(401).send('unauthorized');return reply.type(registry.contentType).send(await registry.metrics());});
 app.get('/api/public-config',async()=>({botUsername:config.BOT_USERNAME||'',appVersion:config.APP_VERSION}));
-app.get('/api/public-status',async()=>({
+app.get('/api/public-status',{config:{rateLimit:false}},async(_request,reply)=>{
+  reply.header('cache-control','no-store, max-age=0');
+  return {
   maintenance:await getSetting<boolean>('maintenance_mode',false),
   title:await getSetting<string>('maintenance_title','Дом закрыт на технические работы'),
   message:await getSetting<string>('maintenance_message','Мы проверяем лифт и комнаты. Ваш прогресс сохранён.'),
@@ -101,7 +103,8 @@ app.get('/api/public-status',async()=>({
   supportUrl:await getSetting<string>('maintenance_support_url',''),
   appVersion:config.APP_VERSION,
   checkedAt:new Date().toISOString()
-}));
+};
+});
 
 await apiRoutes(app);await v2Routes(app);await v4Routes(app);await telegramWebhookRoutes(app);await adminRoutes(app);await adminV2Routes(app);await adminV4Routes(app);
 const realtime=redis?await createRealtimeServer(app.server,app.log):null;

@@ -481,7 +481,7 @@ radio_ok=np.zeros((nframes(1.35),2)); place(radio_ok,.05,click(390,.12),.3); sta
 radio_bad=np.zeros((nframes(1.35),2)); static=filt(noise(.9),"bandpass",(120,1400),3)*envelope(nframes(.9),.08,.48)*.035; place(radio_bad,.1,static,1); place(radio_bad,.72,click(330,.12),.24); write_asset("radio-fail",radio_bad)
 
 
-# UI interaction sounds intentionally omitted in V4.3.1.
+# UI interaction sounds intentionally omitted in V4.3.2.
 
 
 # Rare house events.
@@ -515,7 +515,7 @@ for p in sorted(OUT.iterdir()):
     if p.suffix in {".m4a",".wav"}:
         assets.append({"file":p.name,"bytes":p.stat().st_size})
 import json
-(OUT/"manifest.json").write_text(json.dumps({"version":"4.3.1","sampleRate":SR,"original":True,"assets":assets},ensure_ascii=False,indent=2),encoding="utf-8")
+(OUT/"manifest.json").write_text(json.dumps({"version":"4.3.2","sampleRate":SR,"original":True,"assets":assets},ensure_ascii=False,indent=2),encoding="utf-8")
 
 shutil.rmtree(TMP,ignore_errors=True)
 print(f"Generated {len(assets)} files ({sum(a['bytes'] for a in assets)/1024/1024:.1f} MiB) in {OUT}")

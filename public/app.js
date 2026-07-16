@@ -1,4 +1,4 @@
-const APP_VERSION = "4.3.1";
+const APP_VERSION = "4.3.2";
 const tg = window.Telegram?.WebApp;
 
 if (tg) {
@@ -810,9 +810,49 @@ tg?.SettingsButton?.onClick?.(() =>
 );
 
 async function publicStatus() {
-  const response = await fetch(`/api/public-status?v=${encodeURIComponent(APP_VERSION)}&t=${Date.now()}`, { cache: "no-store" });
-  if (!response.ok) throw new Error("Не удалось проверить состояние дома");
-  return response.json();
+  const url = `/api/public-status?v=${encodeURIComponent(APP_VERSION)}&t=${Date.now()}`;
+  let lastError = null;
+  for (let attempt = 0; attempt < 4; attempt += 1) {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 10_000);
+    try {
+      const response = await fetch(url, {
+        cache: "no-store",
+        headers: { "x-client-version": APP_VERSION },
+        signal: controller.signal,
+      });
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        const error = new Error(
+          payload.error || payload.message ||
+            (response.status === 503
+              ? "Дом ещё запускается после обновления"
+              : `Не удалось проверить состояние дома (${response.status})`),
+        );
+        error.code = payload.code || "PUBLIC_STATUS_UNAVAILABLE";
+        error.status = response.status;
+        throw error;
+      }
+      return payload;
+    } catch (error) {
+      lastError = error;
+      const retryable =
+        error?.name === "AbortError" ||
+        error instanceof TypeError ||
+        [408, 425, 429, 500, 502, 503, 504].includes(error?.status);
+      if (!retryable || attempt === 3) break;
+      await wait(450 * 2 ** attempt + Math.random() * 250);
+    } finally {
+      clearTimeout(timeout);
+    }
+  }
+  if (lastError?.name === "AbortError" || lastError instanceof TypeError) {
+    const error = new Error("Сервер дома не ответил. Railway может ещё завершать запуск обновления.");
+    error.code = "PUBLIC_STATUS_NETWORK_ERROR";
+    error.status = null;
+    throw error;
+  }
+  throw lastError || new Error("Не удалось проверить состояние дома");
 }
 function renderMaintenanceScreen(status) {
   state.maintenance = status;
@@ -917,15 +957,19 @@ async function renderLaunchError(error) {
   const invalidInitData =
     error.code === "TELEGRAM_AUTH_INVALID" ||
     error.code === "TELEGRAM_AUTH_EXPIRED";
+  const serverStarting =
+    error.code === "PUBLIC_STATUS_NETWORK_ERROR" ||
+    error.code === "PUBLIC_STATUS_UNAVAILABLE" ||
+    [502, 503, 504].includes(error.status);
   const explanation = noInitData
     ? `<p>Telegram открыл страницу без подписанного запуска. Закройте окно и войдите новой кнопкой <b>«Открыть двери лифта»</b> в личном чате с ботом.</p>`
     : invalidInitData
       ? `<p>Данные запуска получены, но подпись отклонена. Проверьте, что <code>BOT_TOKEN</code> в Railway принадлежит именно этому боту, затем отправьте боту <code>/start</code> ещё раз.</p>`
-      : `<p>Дом не смог завершить загрузку. Проверьте соединение и повторите запрос.</p>`;
+      : serverStarting
+        ? `<p>Telegram передал данные корректно. Сервер Railway не ответил или ещё завершает запуск. Подождите несколько секунд и нажмите <b>«Проверить ещё раз»</b>.</p>`
+        : `<p>Дом не смог завершить загрузку. Проверьте соединение и повторите запрос.</p>`;
   view.innerHTML = `<div class="card launch-error"><div class="app-badge">${icon("warning")} ДИАГНОСТИКА ВХОДА</div><h3>Двери не открылись</h3><p>${esc(error.message)}</p>${explanation}<div class="button-row"><button class="primary" id="authRetry">${icon("elevator", "button-icon")}Проверить ещё раз</button>${botUsername ? `<button class="secondary" id="authReopen">${icon("send", "button-icon")}Открыть через бота</button>` : ""}</div><details><summary>Техническая информация</summary><pre>${esc(JSON.stringify({ ...diagnostic, serverCode: error.code || null, httpStatus: error.status || null }, null, 2))}</pre></details></div>`;
   $("#authRetry").onclick = async () => {
-    sessionStorage.removeItem("ef_tg_init_data");
-    telegramInitData = "";
     location.reload();
   };
   if (botUsername)
